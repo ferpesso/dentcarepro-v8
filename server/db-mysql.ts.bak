@@ -1,0 +1,1659 @@
+// @ts-nocheck
+import { eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import { InsertUser, users } from "../drizzle/schema";
+import { ENV } from './_core/env';
+
+let _db: ReturnType<typeof drizzle> | null = null;
+
+// Lazily create the drizzle instance so local tooling can run without a DB.
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
+}
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.id) {
+    throw new Error("User ID is required for upsert");
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
+
+  try {
+    const values: InsertUser = {
+      id: user.id,
+    };
+    const updateSet: Record<string, unknown> = {};
+
+    const textFields = ["name", "email", "loginMethod"] as const;
+    type TextField = (typeof textFields)[number];
+
+    const assignNullable = (field: TextField) => {
+      const value = user[field];
+      if (value === undefined) return;
+      const normalized = value ?? null;
+      values[field] = normalized;
+      updateSet[field] = normalized;
+    };
+
+    textFields.forEach(assignNullable);
+
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role === undefined) {
+      if (user.id === ENV.ownerId) {
+        user.role = 'admin';
+        values.role = 'admin';
+        updateSet.role = 'admin';
+      }
+    }
+
+    if (Object.keys(updateSet).length === 0) {
+      updateSet.lastSignedIn = new Date();
+    }
+
+    await db.insert(users).values(values).onDuplicateKeyUpdate({
+      set: updateSet,
+    });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
+}
+
+export async function getUser(id: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// ========================================
+// UTENTES (Pacientes)
+// ========================================
+
+import { utentes, type Utente, type InsertUtente } from "../drizzle/schema";
+import { desc, like, or } from "drizzle-orm";
+
+/**
+ * Gerar número de utente sequencial
+ * Formato: U-2025-0001
+ */
+export async function gerarNumeroUtente(): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const ano = new Date().getFullYear();
+  const prefixo = `U-${ano}-`;
+
+  // Buscar último número do ano
+  const ultimoUtente = await db
+    .select()
+    .from(utentes)
+    .where(like(utentes.numeroUtente, `${prefixo}%`))
+    .orderBy(desc(utentes.numeroUtente))
+    .limit(1);
+
+  let proximoNumero = 1;
+  if (ultimoUtente.length > 0) {
+    const ultimoNumero = parseInt(ultimoUtente[0].numeroUtente.split("-")[2]);
+    proximoNumero = ultimoNumero + 1;
+  }
+
+  return `${prefixo}${proximoNumero.toString().padStart(4, "0")}`;
+}
+
+/**
+ * Criar novo utente
+ */
+export async function criarUtente(data: Omit<InsertUtente, "numeroUtente">): Promise<Utente> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const numeroUtente = await gerarNumeroUtente();
+
+  const [utente] = await db.insert(utentes).values({
+    ...data,
+    numeroUtente,
+  }).$returningId();
+
+  return await obterUtente(utente.id);
+}
+
+/**
+ * Obter utente por ID
+ */
+export async function obterUtente(id: string): Promise<Utente> {
+  const db = await getDb();
+  
+  // Se não houver base de dados, usar dados mock do servidor
+  if (!db) {
+    const { serverMockUtentesAPI } = await import("./mockData");
+    const utente = await serverMockUtentesAPI.obter(id);
+    if (!utente) {
+      throw new Error(`Utente não encontrado: ${id}`);
+    }
+    return utente;
+  }
+
+  const resultado = await db.select().from(utentes).where(eq(utentes.id, id)).limit(1);
+
+  if (resultado.length === 0) {
+    throw new Error(`Utente não encontrado: ${id}`);
+  }
+
+  return resultado[0];
+}
+
+/**
+ * Listar todos os utentes
+ */
+export async function listarUtentes(): Promise<Utente[]> {
+  const db = await getDb();
+  
+  // Se não houver base de dados, usar dados mock do servidor
+  if (!db) {
+    const { serverMockUtentesAPI } = await import("./mockData");
+    return await serverMockUtentesAPI.listar();
+  }
+
+  return await db.select().from(utentes).orderBy(desc(utentes.criadoEm));
+}
+
+/**
+ * Pesquisar utentes por termo
+ */
+export async function pesquisarUtentes(termo: string): Promise<Utente[]> {
+  const db = await getDb();
+  
+  // Se não houver base de dados, usar dados mock do servidor
+  if (!db) {
+    const { serverMockUtentesAPI } = await import("./mockData");
+    return await serverMockUtentesAPI.pesquisar(termo);
+  }
+
+  const termoPesquisa = `%${termo}%`;
+
+  return await db
+    .select()
+    .from(utentes)
+    .where(
+      or(
+        like(utentes.nomeCompleto, termoPesquisa),
+        like(utentes.nif, termoPesquisa),
+        like(utentes.numUtenteSns, termoPesquisa),
+        like(utentes.numeroUtente, termoPesquisa)
+      )
+    )
+    .orderBy(desc(utentes.criadoEm));
+}
+
+/**
+ * Atualizar utente
+ */
+export async function atualizarUtente(id: string, data: Partial<Omit<InsertUtente, "id" | "numeroUtente">>): Promise<Utente> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(utentes).set(data).where(eq(utentes.id, id));
+
+  return await obterUtente(id);
+}
+
+/**
+ * Remover utente (soft delete)
+ */
+export async function removerUtente(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(utentes).set({ status: "arquivado" }).where(eq(utentes.id, id));
+}
+
+/**
+ * Obter estatísticas de utentes
+ */
+export async function obterEstatisticasUtentes(): Promise<{
+  total: number;
+  ativos: number;
+  inativos: number;
+  arquivados: number;
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const todosUtentes = await db.select().from(utentes);
+
+  return {
+    total: todosUtentes.length,
+    ativos: todosUtentes.filter(u => u.status === "ativo").length,
+    inativos: todosUtentes.filter(u => u.status === "inativo").length,
+    arquivados: todosUtentes.filter(u => u.status === "arquivado").length,
+  };
+}
+
+
+// ========================================
+// CONSULTAS
+// ========================================
+
+export interface Consulta {
+  id: string;
+  utenteId: string;
+  medicoId: string | null;
+  dataHora: string; // ISO 8601 format
+  duracao: number;
+  tipoConsulta: string | null;
+  procedimento: string | null;
+  status: "agendada" | "confirmada" | "realizada" | "cancelada" | "faltou" | "em_atendimento";
+  observacoes: string | null;
+  valorEstimado: number | null;
+  classificacaoRisco: string | null;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+export interface InsertConsulta {
+  id?: string;
+  utenteId: string;
+  medicoId?: string | null;
+  dataHora: string;
+  duracao?: number;
+  tipoConsulta?: string | null;
+  procedimento?: string | null;
+  status?: "agendada" | "confirmada" | "realizada" | "cancelada" | "faltou" | "em_atendimento";
+  observacoes?: string | null;
+  valorEstimado?: number | null;
+  classificacaoRisco?: string | null;
+}
+
+/**
+ * Listar todas as consultas
+ */
+export async function listarConsultas(): Promise<Consulta[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.execute(sql`
+    SELECT 
+      id,
+      utente_id as utenteId,
+      medico_id as medicoId,
+      DATE_FORMAT(data_hora, '%Y-%m-%dT%H:%i:%s') as dataHora,
+      duracao,
+      tipo_consulta as tipoConsulta,
+      procedimento,
+      status,
+      observacoes,
+      valor_estimado as valorEstimado,
+      classificacao_risco as classificacaoRisco,
+      DATE_FORMAT(criado_em, '%Y-%m-%dT%H:%i:%s') as criadoEm,
+      DATE_FORMAT(atualizado_em, '%Y-%m-%dT%H:%i:%s') as atualizadoEm
+    FROM consultas
+    ORDER BY data_hora DESC
+  `);
+  
+  return result[0] as Consulta[];
+}
+
+/**
+ * Obter consulta por ID
+ */
+export async function obterConsulta(id: string): Promise<Consulta> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.execute(sql`
+    SELECT 
+      id,
+      utente_id as utenteId,
+      medico_id as medicoId,
+      DATE_FORMAT(data_hora, '%Y-%m-%dT%H:%i:%s') as dataHora,
+      duracao,
+      tipo_consulta as tipoConsulta,
+      procedimento,
+      status,
+      observacoes,
+      valor_estimado as valorEstimado,
+      classificacao_risco as classificacaoRisco,
+      DATE_FORMAT(criado_em, '%Y-%m-%dT%H:%i:%s') as criadoEm,
+      DATE_FORMAT(atualizado_em, '%Y-%m-%dT%H:%i:%s') as atualizadoEm
+    FROM consultas
+    WHERE id = ${id}
+  `);
+  
+  const consultas = result[0] as Consulta[];
+  if (!consultas || consultas.length === 0) {
+    throw new Error(`Consulta com ID ${id} não encontrada`);
+  }
+  
+  return consultas[0];
+}
+
+/**
+ * Criar nova consulta
+ */
+export async function criarConsulta(data: InsertConsulta): Promise<Consulta> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const id = data.id || `CST${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
+  
+  await db.execute(sql`
+    INSERT INTO consultas (
+      id, utente_id, medico_id, data_hora, duracao, 
+      tipo_consulta, procedimento, status, observacoes, 
+      valor_estimado, classificacao_risco
+    ) VALUES (
+      ${id},
+      ${data.utenteId},
+      ${data.medicoId || null},
+      ${data.dataHora},
+      ${data.duracao || 30},
+      ${data.tipoConsulta || null},
+      ${data.procedimento || null},
+      ${data.status || 'agendada'},
+      ${data.observacoes || null},
+      ${data.valorEstimado || null},
+      ${data.classificacaoRisco || null}
+    )
+  `);
+  
+  return await obterConsulta(id);
+}
+
+/**
+ * Atualizar consulta
+ */
+export async function atualizarConsulta(id: string, data: Partial<InsertConsulta>): Promise<Consulta> {
+  const db = await getDb();
+  if (!db) {
+    // Fallback para dados mock
+    const { serverMockConsultasAPI } = await import('./mockData');
+    return await serverMockConsultasAPI.atualizar(id, data);
+  }
+  
+  const updates: string[] = [];
+  const values: any[] = [];
+  
+  if (data.utenteId !== undefined) {
+    updates.push('utente_id = ?');
+    values.push(data.utenteId);
+  }
+  if (data.medicoId !== undefined) {
+    updates.push('medico_id = ?');
+    values.push(data.medicoId);
+  }
+  if (data.dataHora !== undefined) {
+    updates.push('data_hora = ?');
+    values.push(data.dataHora);
+  }
+  if (data.duracao !== undefined) {
+    updates.push('duracao = ?');
+    values.push(data.duracao);
+  }
+  if (data.tipoConsulta !== undefined) {
+    updates.push('tipo_consulta = ?');
+    values.push(data.tipoConsulta);
+  }
+  if (data.procedimento !== undefined) {
+    updates.push('procedimento = ?');
+    values.push(data.procedimento);
+  }
+  if (data.status !== undefined) {
+    updates.push('status = ?');
+    values.push(data.status);
+  }
+  if (data.observacoes !== undefined) {
+    updates.push('observacoes = ?');
+    values.push(data.observacoes);
+  }
+  if (data.valorEstimado !== undefined) {
+    updates.push('valor_estimado = ?');
+    values.push(data.valorEstimado);
+  }
+  if (data.classificacaoRisco !== undefined) {
+    updates.push('classificacao_risco = ?');
+    values.push(data.classificacaoRisco);
+  }
+  
+  if (updates.length > 0) {
+    values.push(id);
+    const query = `UPDATE consultas SET ${updates.join(', ')} WHERE id = ?`;
+    await db.execute(sql.raw(query, values));
+  }
+  
+  return await obterConsulta(id);
+}
+
+/**
+ * Remover consulta
+ */
+export async function removerConsulta(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.execute(sql`
+    DELETE FROM consultas WHERE id = ${id}
+  `);
+}
+
+/**
+ * Listar consultas por data
+ */
+export async function listarConsultasPorData(data: string): Promise<Consulta[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.execute(sql`
+    SELECT 
+      id,
+      utente_id as utenteId,
+      medico_id as medicoId,
+      DATE_FORMAT(data_hora, '%Y-%m-%dT%H:%i:%s') as dataHora,
+      duracao,
+      tipo_consulta as tipoConsulta,
+      procedimento,
+      status,
+      observacoes,
+      valor_estimado as valorEstimado,
+      classificacao_risco as classificacaoRisco,
+      DATE_FORMAT(criado_em, '%Y-%m-%dT%H:%i:%s') as criadoEm,
+      DATE_FORMAT(atualizado_em, '%Y-%m-%dT%H:%i:%s') as atualizadoEm
+    FROM consultas
+    WHERE DATE(data_hora) = ${data}
+    ORDER BY data_hora ASC
+  `);
+  
+  return result[0] as Consulta[];
+}
+
+/**
+ * Listar consultas por período (semana/mês)
+ */
+export async function listarConsultasPorPeriodo(dataInicio: string, dataFim: string): Promise<Consulta[]> {
+  const db = await getDb();
+  if (!db) {
+    // Fallback para dados mock
+    const { serverMockConsultasAPI } = await import('./mockData');
+    return await serverMockConsultasAPI.listarPorPeriodo(dataInicio, dataFim);
+  }
+  
+  const result = await db.execute(sql`
+    SELECT 
+      id,
+      utente_id as utenteId,
+      medico_id as medicoId,
+      DATE_FORMAT(data_hora, '%Y-%m-%dT%H:%i:%s') as dataHora,
+      duracao,
+      tipo_consulta as tipoConsulta,
+      procedimento,
+      status,
+      observacoes,
+      valor_estimado as valorEstimado,
+      classificacao_risco as classificacaoRisco,
+      DATE_FORMAT(criado_em, '%Y-%m-%dT%H:%i:%s') as criadoEm,
+      DATE_FORMAT(atualizado_em, '%Y-%m-%dT%H:%i:%s') as atualizadoEm
+    FROM consultas
+    WHERE DATE(data_hora) BETWEEN ${dataInicio} AND ${dataFim}
+    ORDER BY data_hora ASC
+  `);
+  
+  return result[0] as Consulta[];
+}
+
+/**
+ * Listar consultas por médico
+ */
+export async function listarConsultasPorMedico(medicoId: string): Promise<Consulta[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.execute(sql`
+    SELECT 
+      id,
+      utente_id as utenteId,
+      medico_id as medicoId,
+      DATE_FORMAT(data_hora, '%Y-%m-%dT%H:%i:%s') as dataHora,
+      duracao,
+      tipo_consulta as tipoConsulta,
+      procedimento,
+      status,
+      observacoes,
+      valor_estimado as valorEstimado,
+      classificacao_risco as classificacaoRisco,
+      DATE_FORMAT(criado_em, '%Y-%m-%dT%H:%i:%s') as criadoEm,
+      DATE_FORMAT(atualizado_em, '%Y-%m-%dT%H:%i:%s') as atualizadoEm
+    FROM consultas
+    WHERE medico_id = ${medicoId}
+    ORDER BY data_hora ASC
+  `);
+  
+  return result[0] as Consulta[];
+}
+
+/**
+ * Verificar conflito de horário
+ */
+export async function verificarConflito(
+  medicoId: string, 
+  dataHora: string, 
+  duracao: number,
+  consultaIdExcluir?: string
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Calcular hora de fim da nova consulta
+  const dataInicio = new Date(dataHora);
+  const dataFim = new Date(dataInicio.getTime() + duracao * 60000);
+  
+  const query = consultaIdExcluir
+    ? sql`
+        SELECT COUNT(*) as count
+        FROM consultas
+        WHERE medico_id = ${medicoId}
+          AND id != ${consultaIdExcluir}
+          AND status NOT IN ('cancelada', 'faltou')
+          AND (
+            (data_hora <= ${dataHora} AND DATE_ADD(data_hora, INTERVAL duracao MINUTE) > ${dataHora})
+            OR
+            (data_hora < ${dataFim.toISOString()} AND DATE_ADD(data_hora, INTERVAL duracao MINUTE) >= ${dataFim.toISOString()})
+            OR
+            (data_hora >= ${dataHora} AND data_hora < ${dataFim.toISOString()})
+          )
+      `
+    : sql`
+        SELECT COUNT(*) as count
+        FROM consultas
+        WHERE medico_id = ${medicoId}
+          AND status NOT IN ('cancelada', 'faltou')
+          AND (
+            (data_hora <= ${dataHora} AND DATE_ADD(data_hora, INTERVAL duracao MINUTE) > ${dataHora})
+            OR
+            (data_hora < ${dataFim.toISOString()} AND DATE_ADD(data_hora, INTERVAL duracao MINUTE) >= ${dataFim.toISOString()})
+            OR
+            (data_hora >= ${dataHora} AND data_hora < ${dataFim.toISOString()})
+          )
+      `;
+  
+  const result = await db.execute(query);
+  const rows = result[0] as any[];
+  
+  return rows[0].count > 0;
+}
+
+/**
+ * Obter estatísticas de consultas
+ */
+export async function obterEstatisticasConsultas(): Promise<{
+  hoje: number;
+  estaSemana: number;
+  agendadas: number;
+  confirmadas: number;
+  realizadas: number;
+  faltou: number;
+  faltou: number;
+  emAtendimento: number;
+  hoje: number;
+  estaSemana: number;
+  esteMes: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    // Fallback para dados mock
+    const { serverMockConsultasAPI } = await import('./mockData');
+    return await serverMockConsultasAPI.estatisticas() as any;
+  }
+  
+  const result = await db.execute(sql`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'agendada' THEN 1 ELSE 0 END) as agendadas,
+      SUM(CASE WHEN status = 'confirmada' THEN 1 ELSE 0 END) as confirmadas,
+      SUM(CASE WHEN status = 'realizada' THEN 1 ELSE 0 END) as realizadas,
+      SUM(CASE WHEN status = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+      SUM(CASE WHEN status = 'faltou' THEN 1 ELSE 0 END) as faltou,
+      SUM(CASE WHEN status = 'em_atendimento' THEN 1 ELSE 0 END) as emAtendimento,
+      SUM(CASE WHEN DATE(data_hora) = CURDATE() THEN 1 ELSE 0 END) as hoje,
+      SUM(CASE WHEN YEARWEEK(data_hora, 1) = YEARWEEK(CURDATE(), 1) THEN 1 ELSE 0 END) as estaSemana,
+      SUM(CASE WHEN YEAR(data_hora) = YEAR(CURDATE()) AND MONTH(data_hora) = MONTH(CURDATE()) THEN 1 ELSE 0 END) as esteMes
+    FROM consultas
+  `);
+  
+  const stats = (result[0] as any[])[0];
+  
+  return {
+    total: Number(stats.total) || 0,
+    agendadas: Number(stats.agendadas) || 0,
+    confirmadas: Number(stats.confirmadas) || 0,
+    realizadas: Number(stats.realizadas) || 0,
+    canceladas: Number(stats.canceladas) || 0,
+    faltou: Number(stats.faltou) || 0,
+    emAtendimento: Number(stats.emAtendimento) || 0,
+    hoje: Number(stats.hoje) || 0,
+    estaSemana: Number(stats.estaSemana) || 0,
+    esteMes: Number(stats.esteMes) || 0,
+  };
+}
+
+
+// ========================================
+// DENTISTAS
+// ========================================
+
+import { dentistas, type Dentista, type InsertDentista } from "../drizzle/schema";
+
+/**
+ * Listar todos os dentistas
+ */
+export async function listarDentistas(): Promise<Dentista[]> {
+  const db = await getDb();
+  if (!db) {
+    // Retornar dados mock se não houver BD
+    return [];
+  }
+
+  return await db.select().from(dentistas).orderBy(desc(dentistas.criadoEm));
+}
+
+/**
+ * Obter dentista por ID
+ */
+export async function obterDentista(id: string): Promise<Dentista | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(dentistas).where(eq(dentistas.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Criar novo dentista
+ */
+export async function criarDentista(data: Omit<InsertDentista, "id">): Promise<Dentista> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = `DENT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  await db.insert(dentistas).values({
+    ...data,
+    id,
+  });
+
+  return await obterDentista(id);
+}
+
+/**
+ * Atualizar dentista
+ */
+export async function atualizarDentista(id: string, data: Partial<Omit<InsertDentista, "id">>): Promise<Dentista> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(dentistas).set(data).where(eq(dentistas.id, id));
+
+  return await obterDentista(id);
+}
+
+/**
+ * Remover dentista (soft delete - marcar como inativo)
+ */
+export async function removerDentista(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(dentistas).set({ status: "inativo" }).where(eq(dentistas.id, id));
+}
+
+// ========================================
+// COMISSÕES
+// ========================================
+
+import { comissoes, type Comissao, type InsertComissao } from "../drizzle/schema";
+import { configComissoes, type ConfigComissao } from "../drizzle/schema";
+
+/**
+ * Obter configuração de comissão do dentista
+ */
+export async function obterConfigComissao(dentistaId: string): Promise<ConfigComissao | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(configComissoes).where(eq(configComissoes.dentistaId, dentistaId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Salvar configuração de comissão
+ */
+export async function salvarConfigComissao(data: Omit<any, "id">): Promise<ConfigComissao> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = `CFGCOM-${Date.now()}`;
+  
+  // Verificar se já existe configuração para este dentista
+  const existente = await obterConfigComissao(data.dentistaId);
+  
+  if (existente) {
+    // Atualizar
+    await db.update(configComissoes).set(data).where(eq(configComissoes.dentistaId, data.dentistaId));
+    return await obterConfigComissao(data.dentistaId);
+  } else {
+    // Criar
+    await db.insert(configComissoes).values({
+      ...data,
+      id,
+    });
+    return await obterConfigComissao(data.dentistaId);
+  }
+}
+
+/**
+ * Listar comissões de um dentista
+ */
+export async function listarComissoesDentista(dentistaId: string, mes?: string): Promise<Comissao[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(comissoes).where(eq(comissoes.dentistaId, dentistaId));
+  
+  if (mes) {
+    // Filtrar por mês (formato: YYYY-MM)
+    query = query.where(sql`DATE_FORMAT(${comissoes.dataReferencia}, '%Y-%m') = ${mes}`);
+  }
+
+  return await query.orderBy(desc(comissoes.dataReferencia));
+}
+
+/**
+ * Criar registro de comissão
+ */
+export async function criarComissao(data: Omit<InsertComissao, "id">): Promise<Comissao> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = `COM-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  await db.insert(comissoes).values({
+    ...data,
+    id,
+  });
+
+  const result = await db.select().from(comissoes).where(eq(comissoes.id, id)).limit(1);
+  return result[0];
+}
+
+/**
+ * Marcar comissão como paga
+ */
+export async function pagarComissao(id: string, formaPagamento: string, referencia?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const hoje = new Date().toISOString().split('T')[0];
+  
+  await db.update(comissoes).set({
+    status: "pago",
+    dataPagamento: hoje,
+    formaPagamento,
+    referenciaPagamento: referencia,
+  }).where(eq(comissoes.id, id));
+}
+
+/**
+ * Obter resumo financeiro do dentista no mês
+ */
+export async function obterResumoFinanceiroDentista(dentistaId: string, mes: string): Promise<{
+  faturado: number;
+  comissoes: number;
+  bonificacoes: number;
+  aReceber: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { faturado: 0, comissoes: 0, bonificacoes: 0, aReceber: 0 };
+  }
+
+  const result = await db.execute(sql`
+    SELECT 
+      SUM(valorBase) as faturado,
+      SUM(valorComissao) as comissoes,
+      SUM(bonificacao) as bonificacoes,
+      SUM(CASE WHEN status = 'a_pagar' THEN valorTotal ELSE 0 END) as aReceber
+    FROM comissoes
+    WHERE dentistaId = ${dentistaId}
+    AND DATE_FORMAT(dataReferencia, '%Y-%m') = ${mes}
+  `);
+
+  const stats = (result[0] as any[])[0];
+
+  return {
+    faturado: Number(stats.faturado) || 0,
+    comissoes: Number(stats.comissoes) || 0,
+    bonificacoes: Number(stats.bonificacoes) || 0,
+    aReceber: Number(stats.aReceber) || 0,
+  };
+}
+
+// ========================================
+// CONFIGURAÇÕES DA CLÍNICA
+// ========================================
+
+import { configClinica, type ConfigClinica } from "../drizzle/schema";
+
+/**
+ * Obter configurações da clínica
+ */
+export async function obterConfigClinica(): Promise<ConfigClinica> {
+  const db = await getDb();
+  if (!db) {
+    // Retornar objeto padrão se DB não disponível
+    return {
+      id: "CONFIG-PRINCIPAL",
+      nomeClinica: "",
+      razaoSocial: "",
+      nif: "",
+      telefone: "",
+      email: "",
+      morada: "{}",
+      criadoEm: new Date(),
+      atualizadoEm: new Date(),
+    } as ConfigClinica;
+  }
+
+  const result = await db.select().from(configClinica).limit(1);
+  
+  if (result.length > 0) {
+    return result[0];
+  }
+  
+  // Retornar objeto padrão se não houver configurações
+  return {
+    id: "CONFIG-PRINCIPAL",
+    nomeClinica: "",
+    razaoSocial: "",
+    nif: "",
+    telefone: "",
+    email: "",
+    morada: "{}",
+    criadoEm: new Date(),
+    atualizadoEm: new Date(),
+  } as ConfigClinica;
+}
+
+/**
+ * Salvar configurações da clínica
+ */
+export async function salvarConfigClinica(data: Omit<any, "id">): Promise<ConfigClinica> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existente = await obterConfigClinica();
+  
+  if (existente) {
+    // Atualizar
+    await db.update(configClinica).set(data).where(eq(configClinica.id, existente.id));
+    return await obterConfigClinica();
+  } else {
+    // Criar
+    const id = "CONFIG-PRINCIPAL";
+    await db.insert(configClinica).values({
+      ...data,
+      id,
+    });
+    return await obterConfigClinica();
+  }
+}
+
+// ========================================
+// FORMAS DE PAGAMENTO
+// ========================================
+
+import { formasPagamento, type FormaPagamento } from "../drizzle/schema";
+
+/**
+ * Listar formas de pagamento ativas
+ */
+export async function listarFormasPagamento(): Promise<FormaPagamento[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(formasPagamento).where(eq(formasPagamento.ativo, true)).orderBy(formasPagamento.ordem);
+}
+
+/**
+ * Criar forma de pagamento
+ */
+export async function criarFormaPagamento(data: Omit<any, "id">): Promise<FormaPagamento> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = `FPAG-${Date.now()}`;
+  
+  await db.insert(formasPagamento).values({
+    ...data,
+    id,
+  });
+
+  const result = await db.select().from(formasPagamento).where(eq(formasPagamento.id, id)).limit(1);
+  return result[0];
+}
+
+
+
+
+
+
+
+// ========================================
+// LABORATÓRIOS
+// ========================================
+
+import { 
+  cadastroLaboratorios, 
+  type CadastroLaboratorio, 
+  type InsertCadastroLaboratorio,
+  trabalhosLaboratorio,
+  type TrabalhoLaboratorio,
+  type InsertTrabalhoLaboratorio
+} from "../drizzle/schema";
+import { nanoid } from "nanoid";
+
+/**
+ * Listar todos os laboratórios
+ */
+export async function listarLaboratorios(filtros?: {
+  status?: "ativo" | "inativo";
+  pesquisa?: string;
+}): Promise<CadastroLaboratorio[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(cadastroLaboratorios);
+
+  if (filtros?.status) {
+    query = query.where(eq(cadastroLaboratorios.status, filtros.status)) as any;
+  }
+
+  if (filtros?.pesquisa) {
+    const termo = `%${filtros.pesquisa}%`;
+    query = query.where(
+      or(
+        like(cadastroLaboratorios.nome, termo),
+        like(cadastroLaboratorios.razaoSocial, termo),
+        like(cadastroLaboratorios.nif, termo)
+      )
+    ) as any;
+  }
+
+  const result = await query.orderBy(desc(cadastroLaboratorios.criadoEm));
+  return result;
+}
+
+/**
+ * Obter laboratório por ID
+ */
+export async function obterLaboratorio(id: string): Promise<CadastroLaboratorio | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(cadastroLaboratorios)
+    .where(eq(cadastroLaboratorios.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+/**
+ * Criar novo laboratório
+ */
+export async function criarLaboratorio(
+  data: Omit<InsertCadastroLaboratorio, "id" | "criadoEm" | "atualizadoEm">
+): Promise<CadastroLaboratorio> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  const laboratorio: InsertCadastroLaboratorio = {
+    id,
+    ...data,
+  };
+
+  await db.insert(cadastroLaboratorios).values(laboratorio);
+
+  const result = await obterLaboratorio(id);
+  if (!result) throw new Error("Failed to create laboratory");
+
+  return result;
+}
+
+/**
+ * Atualizar laboratório
+ */
+export async function atualizarLaboratorio(
+  id: string,
+  data: Partial<Omit<InsertCadastroLaboratorio, "id" | "criadoEm" | "criadoPor">>
+): Promise<CadastroLaboratorio> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(cadastroLaboratorios)
+    .set(data)
+    .where(eq(cadastroLaboratorios.id, id));
+
+  const result = await obterLaboratorio(id);
+  if (!result) throw new Error("Laboratory not found");
+
+  return result;
+}
+
+/**
+ * Excluir laboratório (soft delete - marca como inativo)
+ */
+export async function excluirLaboratorio(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(cadastroLaboratorios)
+    .set({ status: "inativo" })
+    .where(eq(cadastroLaboratorios.id, id));
+}
+
+// ========================================
+// TRABALHOS DE LABORATÓRIO
+// ========================================
+
+/**
+ * Listar trabalhos de laboratório
+ */
+export async function listarTrabalhosLaboratorio(filtros?: {
+  laboratorioId?: string;
+  utenteId?: string;
+  dentistaId?: string;
+  status?: string;
+}): Promise<TrabalhoLaboratorio[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(trabalhosLaboratorio);
+
+  if (filtros?.laboratorioId) {
+    query = query.where(eq(trabalhosLaboratorio.laboratorioId, filtros.laboratorioId)) as any;
+  }
+
+  if (filtros?.utenteId) {
+    query = query.where(eq(trabalhosLaboratorio.utenteId, filtros.utenteId)) as any;
+  }
+
+  if (filtros?.dentistaId) {
+    query = query.where(eq(trabalhosLaboratorio.dentistaId, filtros.dentistaId)) as any;
+  }
+
+  if (filtros?.status) {
+    query = query.where(eq(trabalhosLaboratorio.status, filtros.status as any)) as any;
+  }
+
+  const result = await query.orderBy(desc(trabalhosLaboratorio.criadoEm));
+  return result;
+}
+
+/**
+ * Obter trabalho de laboratório por ID
+ */
+export async function obterTrabalhoLaboratorio(id: string): Promise<TrabalhoLaboratorio | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(trabalhosLaboratorio)
+    .where(eq(trabalhosLaboratorio.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+/**
+ * Criar novo trabalho de laboratório
+ */
+export async function criarTrabalhoLaboratorio(
+  data: Omit<InsertTrabalhoLaboratorio, "id" | "criadoEm" | "atualizadoEm">
+): Promise<TrabalhoLaboratorio> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  
+  // Calcular margem de lucro se tiver ambos os valores
+  let margemLucro = data.margemLucro;
+  if (data.valorCobradoUtente && data.custoLaboratorio) {
+    margemLucro = Number(data.valorCobradoUtente) - Number(data.custoLaboratorio);
+  }
+
+  const trabalho: InsertTrabalhoLaboratorio = {
+    id,
+    ...data,
+    margemLucro: margemLucro?.toString(),
+  };
+
+  await db.insert(trabalhosLaboratorio).values(trabalho);
+
+  const result = await obterTrabalhoLaboratorio(id);
+  if (!result) throw new Error("Failed to create laboratory work");
+
+  return result;
+}
+
+/**
+ * Atualizar trabalho de laboratório
+ */
+export async function atualizarTrabalhoLaboratorio(
+  id: string,
+  data: Partial<Omit<InsertTrabalhoLaboratorio, "id" | "criadoEm" | "criadoPor">>
+): Promise<TrabalhoLaboratorio> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Recalcular margem de lucro se necessário
+  const trabalhoAtual = await obterTrabalhoLaboratorio(id);
+  if (trabalhoAtual) {
+    const valorCobrado = data.valorCobradoUtente || trabalhoAtual.valorCobradoUtente;
+    const custo = data.custoLaboratorio || trabalhoAtual.custoLaboratorio;
+    
+    if (valorCobrado && custo) {
+      data.margemLucro = (Number(valorCobrado) - Number(custo)).toString();
+    }
+  }
+
+  await db
+    .update(trabalhosLaboratorio)
+    .set(data)
+    .where(eq(trabalhosLaboratorio.id, id));
+
+  const result = await obterTrabalhoLaboratorio(id);
+  if (!result) throw new Error("Laboratory work not found");
+
+  return result;
+}
+
+/**
+ * Excluir trabalho de laboratório
+ */
+export async function excluirTrabalhoLaboratorio(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(trabalhosLaboratorio)
+    .set({ status: "cancelado" })
+    .where(eq(trabalhosLaboratorio.id, id));
+}
+
+// ========================================
+// CATEGORIAS DE DESPESA
+// ========================================
+
+import {
+  categoriasDespesa,
+  type CategoriaDespesa,
+  type InsertCategoriaDespesa
+} from "../drizzle/schema";
+
+/**
+ * Listar categorias de despesa
+ */
+export async function listarCategoriasDespesa(filtros?: {
+  tipo?: "fixa" | "variavel";
+  ativo?: boolean;
+}): Promise<CategoriaDespesa[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(categoriasDespesa);
+
+  if (filtros?.tipo) {
+    query = query.where(eq(categoriasDespesa.tipo, filtros.tipo)) as any;
+  }
+
+  if (filtros?.ativo !== undefined) {
+    query = query.where(eq(categoriasDespesa.ativo, filtros.ativo)) as any;
+  }
+
+  const result = await query.orderBy(categoriasDespesa.ordem);
+  return result;
+}
+
+/**
+ * Criar categoria de despesa
+ */
+export async function criarCategoriaDespesa(
+  data: Omit<InsertCategoriaDespesa, "id" | "criadoEm" | "atualizadoEm">
+): Promise<CategoriaDespesa> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  const categoria: InsertCategoriaDespesa = {
+    id,
+    ...data,
+  };
+
+  await db.insert(categoriasDespesa).values(categoria);
+
+  const result = await db
+    .select()
+    .from(categoriasDespesa)
+    .where(eq(categoriasDespesa.id, id))
+    .limit(1);
+
+  if (!result[0]) throw new Error("Failed to create category");
+  return result[0];
+}
+
+/**
+ * Criar categorias padrão
+ */
+export async function criarCategoriasDespesaPadrao(): Promise<void> {
+  const categoriasPadrao = [
+    // Despesas Fixas
+    { nome: "Aluguel/Renda", tipo: "fixa" as const, icone: "🏢", cor: "#ef4444", ordem: 1 },
+    { nome: "Salários", tipo: "fixa" as const, icone: "💰", cor: "#f59e0b", ordem: 2 },
+    { nome: "Água, Luz, Internet", tipo: "fixa" as const, icone: "⚡", cor: "#3b82f6", ordem: 3 },
+    { nome: "Seguros", tipo: "fixa" as const, icone: "🛡️", cor: "#8b5cf6", ordem: 4 },
+    { nome: "Licenças e Taxas", tipo: "fixa" as const, icone: "📋", cor: "#ec4899", ordem: 5 },
+    
+    // Despesas Variáveis
+    { nome: "Materiais Odontológicos", tipo: "variavel" as const, icone: "🦷", cor: "#10b981", ordem: 10 },
+    { nome: "Laboratório", tipo: "variavel" as const, icone: "🔬", cor: "#06b6d4", ordem: 11 },
+    { nome: "Comissões", tipo: "variavel" as const, icone: "💵", cor: "#f59e0b", ordem: 12 },
+    { nome: "Marketing", tipo: "variavel" as const, icone: "📢", cor: "#8b5cf6", ordem: 13 },
+    { nome: "Manutenção", tipo: "variavel" as const, icone: "🔧", cor: "#6b7280", ordem: 14 },
+    { nome: "Outros", tipo: "variavel" as const, icone: "📦", cor: "#9ca3af", ordem: 99 },
+  ];
+
+  for (const cat of categoriasPadrao) {
+    try {
+      await criarCategoriaDespesa(cat);
+    } catch (error) {
+      // Ignorar se já existir
+      console.log(`Categoria ${cat.nome} já existe ou erro ao criar`);
+    }
+  }
+}
+
+// ========================================
+// FORNECEDORES
+// ========================================
+
+import {
+  fornecedores,
+  type Fornecedor,
+  type InsertFornecedor
+} from "../drizzle/schema";
+
+/**
+ * Listar fornecedores
+ */
+export async function listarFornecedores(filtros?: {
+  tipo?: string;
+  status?: "ativo" | "inativo";
+  pesquisa?: string;
+}): Promise<Fornecedor[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(fornecedores);
+
+  if (filtros?.tipo) {
+    query = query.where(eq(fornecedores.tipo, filtros.tipo as any)) as any;
+  }
+
+  if (filtros?.status) {
+    query = query.where(eq(fornecedores.status, filtros.status)) as any;
+  }
+
+  if (filtros?.pesquisa) {
+    const termo = `%${filtros.pesquisa}%`;
+    query = query.where(
+      or(
+        like(fornecedores.nome, termo),
+        like(fornecedores.razaoSocial, termo),
+        like(fornecedores.nif, termo)
+      )
+    ) as any;
+  }
+
+  const result = await query.orderBy(desc(fornecedores.criadoEm));
+  return result;
+}
+
+/**
+ * Criar fornecedor
+ */
+export async function criarFornecedor(
+  data: Omit<InsertFornecedor, "id" | "criadoEm" | "atualizadoEm">
+): Promise<Fornecedor> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  const fornecedor: InsertFornecedor = {
+    id,
+    ...data,
+  };
+
+  await db.insert(fornecedores).values(fornecedor);
+
+  const result = await db
+    .select()
+    .from(fornecedores)
+    .where(eq(fornecedores.id, id))
+    .limit(1);
+
+  if (!result[0]) throw new Error("Failed to create supplier");
+  return result[0];
+}
+
+
+
+
+// ========================================
+// CONTAS A PAGAR
+// ========================================
+
+import {
+  contasPagar,
+  type ContaPagar,
+  type InsertContaPagar,
+  pagamentosContasPagar,
+  type PagamentoContaPagar,
+  type InsertPagamentoContaPagar
+} from "../drizzle/schema";
+
+/**
+ * Listar contas a pagar
+ */
+export async function listarContasPagar(filtros?: {
+  status?: string;
+  categoriaId?: string;
+  fornecedorId?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  vencimentoInicio?: string;
+  vencimentoFim?: string;
+}): Promise<ContaPagar[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(contasPagar);
+
+  // Aplicar filtros
+  const conditions = [];
+
+  if (filtros?.status) {
+    conditions.push(eq(contasPagar.status, filtros.status as any));
+  }
+
+  if (filtros?.categoriaId) {
+    conditions.push(eq(contasPagar.categoriaId, filtros.categoriaId));
+  }
+
+  if (filtros?.fornecedorId) {
+    conditions.push(eq(contasPagar.fornecedorId, filtros.fornecedorId));
+  }
+
+  if (filtros?.dataInicio) {
+    conditions.push(gte(contasPagar.dataEmissao, filtros.dataInicio));
+  }
+
+  if (filtros?.dataFim) {
+    conditions.push(lte(contasPagar.dataEmissao, filtros.dataFim));
+  }
+
+  if (filtros?.vencimentoInicio) {
+    conditions.push(gte(contasPagar.dataVencimento, filtros.vencimentoInicio));
+  }
+
+  if (filtros?.vencimentoFim) {
+    conditions.push(lte(contasPagar.dataVencimento, filtros.vencimentoFim));
+  }
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+
+  const result = await query.orderBy(desc(contasPagar.dataVencimento));
+  return result;
+}
+
+/**
+ * Obter conta a pagar por ID
+ */
+export async function obterContaPagar(id: string): Promise<ContaPagar | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(contasPagar)
+    .where(eq(contasPagar.id, id))
+    .limit(1);
+
+  return result[0];
+}
+
+/**
+ * Criar conta a pagar
+ */
+export async function criarContaPagar(
+  data: Omit<InsertContaPagar, "id" | "criadoEm" | "atualizadoEm">
+): Promise<ContaPagar> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  const conta: InsertContaPagar = {
+    id,
+    ...data,
+  };
+
+  await db.insert(contasPagar).values(conta);
+
+  const result = await obterContaPagar(id);
+  if (!result) throw new Error("Failed to create conta a pagar");
+
+  return result;
+}
+
+/**
+ * Atualizar conta a pagar
+ */
+export async function atualizarContaPagar(
+  id: string,
+  data: Partial<Omit<InsertContaPagar, "id" | "criadoEm" | "criadoPor">>
+): Promise<ContaPagar> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(contasPagar)
+    .set(data)
+    .where(eq(contasPagar.id, id));
+
+  const result = await obterContaPagar(id);
+  if (!result) throw new Error("Conta a pagar not found");
+
+  return result;
+}
+
+/**
+ * Excluir conta a pagar
+ */
+export async function excluirContaPagar(id: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(contasPagar).where(eq(contasPagar.id, id));
+}
+
+/**
+ * Registrar pagamento de conta
+ */
+export async function registrarPagamentoConta(
+  data: Omit<InsertPagamentoContaPagar, "id" | "criadoEm">
+): Promise<PagamentoContaPagar> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const id = nanoid();
+  const pagamento: InsertPagamentoContaPagar = {
+    id,
+    ...data,
+  };
+
+  await db.insert(pagamentosContasPagar).values(pagamento);
+
+  // Atualizar status e valores da conta
+  const conta = await obterContaPagar(data.contaPagarId);
+  if (conta) {
+    const valorPago = Number(conta.valorPago || 0) + Number(data.valorPago);
+    const valorTotal = Number(conta.valorTotal);
+    
+    let novoStatus: "pendente" | "pago_parcial" | "pago" | "vencido" | "cancelado" = "pendente";
+    
+    if (valorPago >= valorTotal) {
+      novoStatus = "pago";
+    } else if (valorPago > 0) {
+      novoStatus = "pago_parcial";
+    }
+
+    await atualizarContaPagar(data.contaPagarId, {
+      valorPago: valorPago.toString(),
+      status: novoStatus,
+    });
+  }
+
+  const result = await db
+    .select()
+    .from(pagamentosContasPagar)
+    .where(eq(pagamentosContasPagar.id, id))
+    .limit(1);
+
+  if (!result[0]) throw new Error("Failed to register payment");
+  return result[0];
+}
+
+/**
+ * Listar pagamentos de uma conta
+ */
+export async function listarPagamentosConta(contaPagarId: string): Promise<PagamentoContaPagar[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select()
+    .from(pagamentosContasPagar)
+    .where(eq(pagamentosContasPagar.contaPagarId, contaPagarId))
+    .orderBy(desc(pagamentosContasPagar.dataPagamento));
+
+  return result;
+}
+
+/**
+ * Obter estatísticas de contas a pagar
+ */
+export async function obterEstatisticasContasPagar(filtros?: {
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<{
+  totalPendente: number;
+  totalVencido: number;
+  totalPago: number;
+  totalMes: number;
+  contasPendentes: number;
+  contasVencidas: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalPendente: 0,
+      totalVencido: 0,
+      totalPago: 0,
+      totalMes: 0,
+      contasPendentes: 0,
+      contasVencidas: 0,
+    };
+  }
+
+  const contas = await listarContasPagar(filtros);
+  const hoje = new Date().toISOString().split("T")[0];
+
+  let totalPendente = 0;
+  let totalVencido = 0;
+  let totalPago = 0;
+  let contasPendentes = 0;
+  let contasVencidas = 0;
+
+  contas.forEach((conta) => {
+    const valorTotal = Number(conta.valorTotal);
+    const valorPago = Number(conta.valorPago || 0);
+    const saldo = valorTotal - valorPago;
+
+    if (conta.status === "pago") {
+      totalPago += valorTotal;
+    } else {
+      if (conta.dataVencimento < hoje) {
+        totalVencido += saldo;
+        contasVencidas++;
+      } else {
+        totalPendente += saldo;
+        contasPendentes++;
+      }
+    }
+  });
+
+  // Total do mês atual
+  const mesAtual = new Date().toISOString().substring(0, 7);
+  const contasMes = contas.filter(
+    (c) => c.dataEmissao?.startsWith(mesAtual)
+  );
+  const totalMes = contasMes.reduce(
+    (acc, c) => acc + Number(c.valorTotal),
+    0
+  );
+
+  return {
+    totalPendente,
+    totalVencido,
+    totalPago,
+    totalMes,
+    contasPendentes,
+    contasVencidas,
+  };
+}
+

@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1760713479061,
+      "tag": "0000_dizzy_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1760714349710,
+      "tag": "0001_safe_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1760714576900,
+      "tag": "0002_cynical_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1760724188199,
+      "tag": "0003_complete_joystick",
+      "breakpoints": true
+    }
+  ]
+}

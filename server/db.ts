@@ -1,0 +1,1197 @@
+// PostgreSQL database for DentCarePRO
+import pg from 'pg';
+import type { InsertUser } from "../drizzle/schema";
+
+const { Pool } = pg;
+
+// Create PostgreSQL connection pool
+const pool = new Pool({
+  host: 'localhost',
+  port: 5432,
+  database: 'dentcarepro',
+  user: 'dentcarepro',
+  password: 'dentcare2025',
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  ssl: false,
+});
+
+// Test connection
+pool.on('connect', () => {
+  console.log('[PostgreSQL] Connected to database');
+});
+
+pool.on('error', (err) => {
+  console.error('[PostgreSQL] Unexpected error:', err);
+});
+
+export async function getDb() {
+  return pool;
+}
+
+// ========================================
+// USERS
+// ========================================
+
+export async function getUser(userId: string) {
+  try {
+    console.log('[DB] getUser called with userId:', userId);
+    const result = await pool.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
+    console.log('[DB] getUser result:', result.rows.length, 'rows');
+    const user = result.rows[0] || null;
+    if (user) {
+      // Convert snake_case to camelCase for compatibility
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        loginMethod: user.login_method,
+        role: user.role,
+        lastSignedIn: user.last_signed_in,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('[DB ERROR] getUser failed:', error);
+    throw error;
+  }
+}
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.id) {
+    throw new Error("User ID is required for upsert");
+  }
+  
+  await pool.query(
+    `INSERT INTO users (id, name, email, login_method, role, last_signed_in, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name,
+       email = EXCLUDED.email,
+       last_signed_in = EXCLUDED.last_signed_in,
+       updated_at = CURRENT_TIMESTAMP`,
+    [user.id, user.name, user.email, user.loginMethod, user.role || 'user', user.lastSignedIn || new Date()]
+  );
+}
+
+// ========================================
+// CONFIGURAÇÕES DA CLÍNICA
+// ========================================
+
+export async function obterConfigClinica() {
+  const result = await pool.query(
+    'SELECT * FROM config_clinica WHERE id = $1',
+    ['config-1']
+  );
+  
+  if (result.rows.length === 0) {
+    // Retornar configuração padrão se não existir
+    return {
+      id: 'config-1',
+      nomeClinica: 'Clínica Dentária',
+      email: 'geral@clinica.pt',
+      telefone: '',
+      cidade: 'Lisboa',
+      pais: 'Portugal'
+    };
+  }
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    nomeClinica: row.nome_clinica,
+    razaoSocial: row.razao_social,
+    nif: row.nif,
+    numeroRegisto: row.numero_registo,
+    telefone: row.telefone,
+    telemovel: row.telemovel,
+    email: row.email,
+    website: row.website,
+    rua: row.rua,
+    numero: row.numero,
+    complemento: row.complemento,
+    codigoPostal: row.codigo_postal,
+    cidade: row.cidade,
+    pais: row.pais,
+    nomeFantasia: row.nome_fantasia,
+    logotipo: row.logotipo,
+    atualizadoEm: row.updated_at,
+  };
+}
+
+export async function salvarConfigClinica(dados: any) {
+  await pool.query(
+    `UPDATE config_clinica SET
+      nome_clinica = $1,
+      razao_social = $2,
+      nif = $3,
+      numero_registo = $4,
+      telefone = $5,
+      telemovel = $6,
+      email = $7,
+      website = $8,
+      rua = $9,
+      numero = $10,
+      complemento = $11,
+      codigo_postal = $12,
+      cidade = $13,
+      pais = $14,
+      nome_fantasia = $15,
+      logotipo = $16,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 'config-1'`,
+    [
+      dados.nomeClinica, dados.razaoSocial, dados.nif, dados.numeroRegisto,
+      dados.telefone, dados.telemovel, dados.email, dados.website,
+      dados.rua, dados.numero, dados.complemento, dados.codigoPostal,
+      dados.cidade, dados.pais, dados.nomeFantasia, dados.logotipo
+    ]
+  );
+  
+  return await obterConfigClinica();
+}
+
+// ========================================
+// UTENTES
+// ========================================
+
+export async function listarUtentes() {
+  const result = await pool.query(
+    'SELECT * FROM utentes ORDER BY created_at DESC'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    codigo: row.codigo,
+    nome: row.nome,
+    dataNascimento: row.data_nascimento,
+    genero: row.genero,
+    nif: row.nif,
+    numeroSNS: row.numero_sns,
+    email: row.email,
+    telefone: row.telefone,
+    telemovel: row.telemovel,
+    rua: row.rua,
+    numero: row.numero,
+    complemento: row.complemento,
+    codigoPostal: row.codigo_postal,
+    cidade: row.cidade,
+    pais: row.pais,
+    estado: row.estado,
+    observacoes: row.observacoes,
+    alergias: row.alergias,
+    medicamentos: row.medicamentos,
+    historicoMedico: row.historico_medico,
+    criadoEm: row.created_at,
+    atualizadoEm: row.updated_at,
+  }));
+}
+
+export async function obterUtente(id: string) {
+  try {
+    console.log('[DEBUG] obterUtente called with id:', id);
+    const result = await pool.query(
+      'SELECT * FROM utentes WHERE id = $1',
+      [id]
+    );
+    console.log('[DEBUG] Query result rows:', result.rows.length);
+    
+    if (result.rows.length === 0) {
+      console.log('[DEBUG] No utente found');
+      return null;
+    }
+  
+  const row = result.rows[0];
+  
+  // Converter alergias e medicamentos de string para array
+  const alergias = row.alergias ? row.alergias.split(',').map((a: string) => a.trim()).filter((a: string) => a) : [];
+  const medicamentos = row.medicamentos ? row.medicamentos.split(',').map((m: string) => m.trim()).filter((m: string) => m) : [];
+  
+  return {
+    id: row.id,
+    codigo: row.codigo,
+    nomeCompleto: row.nome,
+    nome: row.nome,
+    dataNascimento: row.data_nascimento,
+    genero: row.genero,
+    nif: row.nif,
+    numUtenteSns: row.numero_sns,
+    numeroSNS: row.numero_sns,
+    estado: row.estado,
+    status: row.estado,
+    observacoes: row.observacoes,
+    contacto: {
+      telefone: row.telefone || '',
+      telemovel: row.telemovel || '',
+      email: row.email || '',
+      telefoneEmergencia: '',
+    },
+    morada: {
+      rua: row.rua || '',
+      numero: row.numero || '',
+      complemento: row.complemento || '',
+      codigoPostal: row.codigo_postal || '',
+      localidade: row.cidade || '',
+      distrito: row.cidade || '',
+    },
+    infoMedica: {
+      alergias: alergias,
+      medicamentos: medicamentos,
+      condicoesMedicas: [],
+      classificacaoAsa: 'I',
+      grupoSanguineo: '',
+      notasImportantes: row.historico_medico || '',
+    },
+    tags: [],
+    criadoEm: row.created_at,
+    atualizadoEm: row.updated_at,
+  };
+  } catch (error) {
+    console.error('[ERROR] obterUtente failed:', error);
+    throw error;
+  }
+}
+
+export async function pesquisarUtentes(termo: string) {
+  if (!termo) return await listarUtentes();
+  
+  const termoLike = `%${termo}%`;
+  const result = await pool.query(
+    `SELECT * FROM utentes 
+     WHERE nome ILIKE $1 
+        OR nif ILIKE $1 
+        OR numero_sns ILIKE $1 
+        OR email ILIKE $1 
+        OR codigo ILIKE $1
+     ORDER BY created_at DESC`,
+    [termoLike]
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    codigo: row.codigo,
+    nome: row.nome,
+    dataNascimento: row.data_nascimento,
+    genero: row.genero,
+    nif: row.nif,
+    numeroSNS: row.numero_sns,
+    email: row.email,
+    telefone: row.telefone,
+    telemovel: row.telemovel,
+    estado: row.estado,
+    alergias: row.alergias,
+    medicamentos: row.medicamentos,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function criarUtente(dados: any) {
+  const id = `utente-${Date.now()}`;
+  
+  // Get next codigo
+  const countResult = await pool.query('SELECT COUNT(*) FROM utentes');
+  const count = parseInt(countResult.rows[0].count) + 1;
+  const codigo = dados.codigo || `U${String(count).padStart(3, '0')}`;
+  
+  await pool.query(
+    `INSERT INTO utentes (
+      id, codigo, nome, data_nascimento, genero, nif, numero_sns,
+      email, telefone, telemovel, rua, numero, complemento,
+      codigo_postal, cidade, pais, estado, observacoes,
+      alergias, medicamentos, historico_medico
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+    [
+      id, codigo, dados.nome, dados.dataNascimento, dados.genero,
+      dados.nif, dados.numeroSNS, dados.email, dados.telefone, dados.telemovel,
+      dados.rua, dados.numero, dados.complemento, dados.codigoPostal,
+      dados.cidade, dados.pais || 'Portugal', dados.estado || 'ativo',
+      dados.observacoes, dados.alergias, dados.medicamentos, dados.historicoMedico
+    ]
+  );
+  
+  return await obterUtente(id);
+}
+
+export async function atualizarUtente(id: string, dados: any) {
+  await pool.query(
+    `UPDATE utentes SET
+      nome = $1, data_nascimento = $2, genero = $3, nif = $4,
+      numero_sns = $5, email = $6, telefone = $7, telemovel = $8,
+      rua = $9, numero = $10, complemento = $11, codigo_postal = $12,
+      cidade = $13, pais = $14, estado = $15, observacoes = $16,
+      alergias = $17, medicamentos = $18, historico_medico = $19,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $20`,
+    [
+      dados.nome, dados.dataNascimento, dados.genero, dados.nif,
+      dados.numeroSNS, dados.email, dados.telefone, dados.telemovel,
+      dados.rua, dados.numero, dados.complemento, dados.codigoPostal,
+      dados.cidade, dados.pais, dados.estado, dados.observacoes,
+      dados.alergias, dados.medicamentos, dados.historicoMedico, id
+    ]
+  );
+  
+  return await obterUtente(id);
+}
+
+export async function removerUtente(id: string) {
+  await pool.query('DELETE FROM utentes WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+export async function obterEstatisticasUtentes() {
+  const result = await pool.query(`
+    SELECT 
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE estado = 'ativo') as ativos,
+      COUNT(*) FILTER (WHERE estado = 'inativo') as inativos,
+      COUNT(*) FILTER (WHERE estado = 'arquivado') as arquivados
+    FROM utentes
+  `);
+  
+  const row = result.rows[0];
+  return {
+    total: parseInt(row.total),
+    ativos: parseInt(row.ativos),
+    inativos: parseInt(row.inativos),
+    arquivados: parseInt(row.arquivados),
+  };
+}
+
+// ========================================
+// CONSULTAS
+// ========================================
+
+export async function listarConsultas() {
+  const result = await pool.query(`
+    SELECT c.*, 
+           u.nome as utente_nome,
+           d.nome as dentista_nome
+    FROM consultas c
+    LEFT JOIN utentes u ON c.utente_id = u.id
+    LEFT JOIN dentistas d ON c.dentista_id = d.id
+    ORDER BY c.data_hora DESC
+  `);
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    utenteId: row.utente_id,
+    utenteNome: row.utente_nome,
+    dentistaId: row.dentista_id,
+    dentistaNome: row.dentista_nome,
+    dataHora: row.data_hora,
+    duracao: row.duracao,
+    tipo: row.tipo,
+    status: row.status,
+    observacoes: row.observacoes,
+    valor: row.valor ? parseFloat(row.valor) : null,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterConsulta(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM consultas WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    utenteId: row.utente_id,
+    dentistaId: row.dentista_id,
+    dataHora: row.data_hora,
+    duracao: row.duracao,
+    tipo: row.tipo,
+    status: row.status,
+    observacoes: row.observacoes,
+    valor: row.valor ? parseFloat(row.valor) : null,
+  };
+}
+
+export async function criarConsulta(dados: any) {
+  const id = `consulta-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO consultas (id, utente_id, dentista_id, data_hora, duracao, tipo, status, observacoes, valor)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, dados.utenteId, dados.dentistaId, dados.dataHora, dados.duracao || 30,
+     dados.tipo, dados.status || 'agendada', dados.observacoes, dados.valor]
+  );
+  
+  return await obterConsulta(id);
+}
+
+export async function atualizarConsulta(id: string, dados: any) {
+  await pool.query(
+    `UPDATE consultas SET
+      utente_id = $1, dentista_id = $2, data_hora = $3, duracao = $4,
+      tipo = $5, status = $6, observacoes = $7, valor = $8,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $9`,
+    [dados.utenteId, dados.dentistaId, dados.dataHora, dados.duracao,
+     dados.tipo, dados.status, dados.observacoes, dados.valor, id]
+  );
+  
+  return await obterConsulta(id);
+}
+
+export async function removerConsulta(id: string) {
+  await pool.query('DELETE FROM consultas WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+// ========================================
+// DENTISTAS
+// ========================================
+
+export async function listarDentistas() {
+  const result = await pool.query(
+    'SELECT * FROM dentistas ORDER BY nome'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    nome: row.nome,
+    especialidade: row.especialidade,
+    numeroOrdem: row.numero_ordem,
+    email: row.email,
+    telefone: row.telefone,
+    telemovel: row.telemovel,
+    ativo: row.ativo,
+    corAgenda: row.cor_agenda,
+    observacoes: row.observacoes,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterDentista(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM dentistas WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    nome: row.nome,
+    especialidade: row.especialidade,
+    numeroOrdem: row.numero_ordem,
+    email: row.email,
+    telefone: row.telefone,
+    telemovel: row.telemovel,
+    ativo: row.ativo,
+    corAgenda: row.cor_agenda,
+    observacoes: row.observacoes,
+  };
+}
+
+export async function criarDentista(dados: any) {
+  const id = `dentista-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO dentistas (id, nome, especialidade, numero_ordem, email, telefone, telemovel, ativo, cor_agenda, observacoes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [id, dados.nome, dados.especialidade, dados.numeroOrdem, dados.email,
+     dados.telefone, dados.telemovel, dados.ativo !== false, dados.corAgenda, dados.observacoes]
+  );
+  
+  return await obterDentista(id);
+}
+
+export async function atualizarDentista(id: string, dados: any) {
+  await pool.query(
+    `UPDATE dentistas SET
+      nome = $1, especialidade = $2, numero_ordem = $3, email = $4,
+      telefone = $5, telemovel = $6, ativo = $7, cor_agenda = $8,
+      observacoes = $9, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $10`,
+    [dados.nome, dados.especialidade, dados.numeroOrdem, dados.email,
+     dados.telefone, dados.telemovel, dados.ativo, dados.corAgenda,
+     dados.observacoes, id]
+  );
+  
+  return await obterDentista(id);
+}
+
+export async function removerDentista(id: string) {
+  await pool.query('DELETE FROM dentistas WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+// ========================================
+// FORMAS DE PAGAMENTO
+// ========================================
+
+export async function listarFormasPagamento() {
+  const result = await pool.query(
+    'SELECT * FROM formas_pagamento WHERE ativo = true ORDER BY nome'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    nome: row.nome,
+    ativo: row.ativo,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function criarFormaPagamento(dados: any) {
+  const id = `fp-${Date.now()}`;
+  
+  await pool.query(
+    'INSERT INTO formas_pagamento (id, nome, ativo) VALUES ($1, $2, $3)',
+    [id, dados.nome, dados.ativo !== false]
+  );
+  
+  const result = await pool.query(
+    'SELECT * FROM formas_pagamento WHERE id = $1',
+    [id]
+  );
+  
+  return result.rows[0];
+}
+
+// ========================================
+// CATEGORIAS DE DESPESA
+// ========================================
+
+export async function listarCategoriasDespesa() {
+  const result = await pool.query(
+    'SELECT * FROM categorias_despesa WHERE ativo = true ORDER BY nome'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    nome: row.nome,
+    descricao: row.descricao,
+    ativo: row.ativo,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function criarCategoriaDespesa(dados: any) {
+  const id = `cat-${Date.now()}`;
+  
+  await pool.query(
+    'INSERT INTO categorias_despesa (id, nome, descricao, ativo) VALUES ($1, $2, $3, $4)',
+    [id, dados.nome, dados.descricao, dados.ativo !== false]
+  );
+  
+  const result = await pool.query(
+    'SELECT * FROM categorias_despesa WHERE id = $1',
+    [id]
+  );
+  
+  return result.rows[0];
+}
+
+// ========================================
+// FORNECEDORES
+// ========================================
+
+export async function listarFornecedores() {
+  const result = await pool.query(
+    'SELECT * FROM fornecedores WHERE ativo = true ORDER BY nome'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    nome: row.nome,
+    nif: row.nif,
+    email: row.email,
+    telefone: row.telefone,
+    rua: row.rua,
+    cidade: row.cidade,
+    codigoPostal: row.codigo_postal,
+    pais: row.pais,
+    ativo: row.ativo,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function criarFornecedor(dados: any) {
+  const id = `fornecedor-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO fornecedores (id, nome, nif, email, telefone, rua, cidade, codigo_postal, pais, ativo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [id, dados.nome, dados.nif, dados.email, dados.telefone,
+     dados.rua, dados.cidade, dados.codigoPostal, dados.pais || 'Portugal', dados.ativo !== false]
+  );
+  
+  const result = await pool.query(
+    'SELECT * FROM fornecedores WHERE id = $1',
+    [id]
+  );
+  
+  return result.rows[0];
+}
+
+// ========================================
+// COMISSÕES
+// ========================================
+
+export async function obterConfigComissao(dentistaId: string) {
+  const result = await pool.query(
+    'SELECT * FROM config_comissoes WHERE dentista_id = $1',
+    [dentistaId]
+  );
+  
+  if (result.rows.length === 0) {
+    return {
+      dentistaId,
+      percentual: 0,
+      ativo: false,
+    };
+  }
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    dentistaId: row.dentista_id,
+    percentual: parseFloat(row.percentual),
+    ativo: row.ativo,
+  };
+}
+
+export async function salvarConfigComissao(dentistaId: string, config: any) {
+  await pool.query(
+    `INSERT INTO config_comissoes (id, dentista_id, percentual, ativo)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (dentista_id) DO UPDATE SET
+       percentual = EXCLUDED.percentual,
+       ativo = EXCLUDED.ativo,
+       updated_at = CURRENT_TIMESTAMP`,
+    [`config-comissao-${dentistaId}`, dentistaId, config.percentual, config.ativo !== false]
+  );
+  
+  return await obterConfigComissao(dentistaId);
+}
+
+export async function listarComissoes() {
+  const result = await pool.query(`
+    SELECT c.*, d.nome as dentista_nome
+    FROM comissoes c
+    LEFT JOIN dentistas d ON c.dentista_id = d.id
+    ORDER BY c.created_at DESC
+  `);
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    dentistaId: row.dentista_id,
+    dentistaNome: row.dentista_nome,
+    faturaId: row.fatura_id,
+    valor: parseFloat(row.valor),
+    percentual: parseFloat(row.percentual),
+    status: row.status,
+    dataPagamento: row.data_pagamento,
+    formaPagamento: row.forma_pagamento,
+    observacoes: row.observacoes,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterComissao(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM comissoes WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    dentistaId: row.dentista_id,
+    faturaId: row.fatura_id,
+    valor: parseFloat(row.valor),
+    percentual: parseFloat(row.percentual),
+    status: row.status,
+  };
+}
+
+export async function listarComissoesDentista(dentistaId: string, filtros?: any) {
+  const result = await pool.query(
+    'SELECT * FROM comissoes WHERE dentista_id = $1 ORDER BY created_at DESC',
+    [dentistaId]
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    dentistaId: row.dentista_id,
+    faturaId: row.fatura_id,
+    valor: parseFloat(row.valor),
+    percentual: parseFloat(row.percentual),
+    status: row.status,
+    dataPagamento: row.data_pagamento,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function criarComissao(dados: any) {
+  const id = `comissao-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO comissoes (id, dentista_id, fatura_id, valor, percentual, status)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, dados.dentistaId, dados.faturaId, dados.valor, dados.percentual, 'pendente']
+  );
+  
+  return await obterComissao(id);
+}
+
+export async function pagarComissao(id: string, formaPagamento: string, observacoes?: string) {
+  await pool.query(
+    `UPDATE comissoes SET
+      status = 'paga',
+      forma_pagamento = $1,
+      observacoes = $2,
+      data_pagamento = CURRENT_DATE,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $3`,
+    [formaPagamento, observacoes, id]
+  );
+  
+  return await obterComissao(id);
+}
+
+export async function obterResumoFinanceiroDentista(dentistaId: string, periodo?: any) {
+  const result = await pool.query(`
+    SELECT 
+      SUM(valor) FILTER (WHERE status = 'pendente') as total_pendente,
+      SUM(valor) FILTER (WHERE status = 'paga') as total_pago,
+      COUNT(*) FILTER (WHERE status = 'pendente') as qtd_pendente,
+      COUNT(*) FILTER (WHERE status = 'paga') as qtd_paga
+    FROM comissoes
+    WHERE dentista_id = $1
+  `, [dentistaId]);
+  
+  const row = result.rows[0];
+  return {
+    totalPendente: parseFloat(row.total_pendente || 0),
+    totalPago: parseFloat(row.total_pago || 0),
+    totalComissoes: parseFloat(row.total_pendente || 0) + parseFloat(row.total_pago || 0),
+    quantidadePendente: parseInt(row.qtd_pendente || 0),
+    quantidadePaga: parseInt(row.qtd_paga || 0),
+  };
+}
+
+// ========================================
+// LABORATÓRIOS
+// ========================================
+
+export async function listarLaboratorios() {
+  const result = await pool.query(
+    'SELECT * FROM laboratorios WHERE ativo = true ORDER BY nome'
+  );
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    nome: row.nome,
+    responsavel: row.responsavel,
+    email: row.email,
+    telefone: row.telefone,
+    rua: row.rua,
+    cidade: row.cidade,
+    codigoPostal: row.codigo_postal,
+    ativo: row.ativo,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterLaboratorio(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM laboratorios WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    nome: row.nome,
+    responsavel: row.responsavel,
+    email: row.email,
+    telefone: row.telefone,
+    rua: row.rua,
+    cidade: row.cidade,
+    codigoPostal: row.codigo_postal,
+    ativo: row.ativo,
+  };
+}
+
+export async function criarLaboratorio(dados: any) {
+  const id = `laboratorio-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO laboratorios (id, nome, responsavel, email, telefone, rua, cidade, codigo_postal, ativo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, dados.nome, dados.responsavel, dados.email, dados.telefone,
+     dados.rua, dados.cidade, dados.codigoPostal, dados.ativo !== false]
+  );
+  
+  return await obterLaboratorio(id);
+}
+
+export async function atualizarLaboratorio(id: string, dados: any) {
+  await pool.query(
+    `UPDATE laboratorios SET
+      nome = $1, responsavel = $2, email = $3, telefone = $4,
+      rua = $5, cidade = $6, codigo_postal = $7, ativo = $8,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $9`,
+    [dados.nome, dados.responsavel, dados.email, dados.telefone,
+     dados.rua, dados.cidade, dados.codigoPostal, dados.ativo, id]
+  );
+  
+  return await obterLaboratorio(id);
+}
+
+export async function removerLaboratorio(id: string) {
+  await pool.query('DELETE FROM laboratorios WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+export async function excluirLaboratorio(id: string) {
+  return await removerLaboratorio(id);
+}
+
+// Trabalhos de laboratório
+export async function listarTrabalhosLaboratorio(filtros: any) {
+  const result = await pool.query(`
+    SELECT t.*, l.nome as laboratorio_nome, u.nome as utente_nome, d.nome as dentista_nome
+    FROM trabalhos_laboratorio t
+    LEFT JOIN laboratorios l ON t.laboratorio_id = l.id
+    LEFT JOIN utentes u ON t.utente_id = u.id
+    LEFT JOIN dentistas d ON t.dentista_id = d.id
+    ORDER BY t.created_at DESC
+  `);
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    laboratorioId: row.laboratorio_id,
+    laboratorioNome: row.laboratorio_nome,
+    utenteId: row.utente_id,
+    utenteNome: row.utente_nome,
+    dentistaId: row.dentista_id,
+    dentistaNome: row.dentista_nome,
+    tipoTrabalho: row.tipo_trabalho,
+    descricao: row.descricao,
+    dataEnvio: row.data_envio,
+    dataPrevistaEntrega: row.data_prevista_entrega,
+    dataEntrega: row.data_entrega,
+    status: row.status,
+    valor: row.valor ? parseFloat(row.valor) : null,
+    observacoes: row.observacoes,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterTrabalhoLaboratorio(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM trabalhos_laboratorio WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    laboratorioId: row.laboratorio_id,
+    utenteId: row.utente_id,
+    dentistaId: row.dentista_id,
+    tipoTrabalho: row.tipo_trabalho,
+    descricao: row.descricao,
+    dataEnvio: row.data_envio,
+    dataPrevistaEntrega: row.data_prevista_entrega,
+    dataEntrega: row.data_entrega,
+    status: row.status,
+    valor: row.valor ? parseFloat(row.valor) : null,
+    observacoes: row.observacoes,
+  };
+}
+
+export async function criarTrabalhoLaboratorio(dados: any) {
+  const id = `trabalho-lab-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO trabalhos_laboratorio 
+     (id, laboratorio_id, utente_id, dentista_id, tipo_trabalho, descricao, 
+      data_envio, data_prevista_entrega, status, valor, observacoes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [id, dados.laboratorioId, dados.utenteId, dados.dentistaId, dados.tipoTrabalho,
+     dados.descricao, dados.dataEnvio, dados.dataPrevistaEntrega, 'enviado',
+     dados.valor, dados.observacoes]
+  );
+  
+  return await obterTrabalhoLaboratorio(id);
+}
+
+export async function atualizarTrabalhoLaboratorio(id: string, dados: any) {
+  await pool.query(
+    `UPDATE trabalhos_laboratorio SET
+      tipo_trabalho = $1, descricao = $2, data_envio = $3,
+      data_prevista_entrega = $4, data_entrega = $5, status = $6,
+      valor = $7, observacoes = $8, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $9`,
+    [dados.tipoTrabalho, dados.descricao, dados.dataEnvio,
+     dados.dataPrevistaEntrega, dados.dataEntrega, dados.status,
+     dados.valor, dados.observacoes, id]
+  );
+  
+  return await obterTrabalhoLaboratorio(id);
+}
+
+export async function excluirTrabalhoLaboratorio(id: string) {
+  await pool.query('DELETE FROM trabalhos_laboratorio WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+// ========================================
+// CONTAS A PAGAR
+// ========================================
+
+export async function listarContasPagar() {
+  const result = await pool.query(`
+    SELECT c.*, f.nome as fornecedor_nome, cat.nome as categoria_nome
+    FROM contas_pagar c
+    LEFT JOIN fornecedores f ON c.fornecedor_id = f.id
+    LEFT JOIN categorias_despesa cat ON c.categoria_id = cat.id
+    ORDER BY c.data_vencimento DESC
+  `);
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    fornecedorId: row.fornecedor_id,
+    fornecedorNome: row.fornecedor_nome,
+    categoriaId: row.categoria_id,
+    categoriaNome: row.categoria_nome,
+    descricao: row.descricao,
+    valor: parseFloat(row.valor),
+    dataVencimento: row.data_vencimento,
+    dataPagamento: row.data_pagamento,
+    status: row.status,
+    formaPagamento: row.forma_pagamento,
+    observacoes: row.observacoes,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterContaPagar(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM contas_pagar WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    fornecedorId: row.fornecedor_id,
+    categoriaId: row.categoria_id,
+    descricao: row.descricao,
+    valor: parseFloat(row.valor),
+    dataVencimento: row.data_vencimento,
+    dataPagamento: row.data_pagamento,
+    status: row.status,
+    formaPagamento: row.forma_pagamento,
+    observacoes: row.observacoes,
+  };
+}
+
+export async function criarContaPagar(dados: any) {
+  const id = `conta-pagar-${Date.now()}`;
+  
+  await pool.query(
+    `INSERT INTO contas_pagar 
+     (id, fornecedor_id, categoria_id, descricao, valor, data_vencimento, status, observacoes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, dados.fornecedorId, dados.categoriaId, dados.descricao,
+     dados.valor, dados.dataVencimento, 'pendente', dados.observacoes]
+  );
+  
+  return await obterContaPagar(id);
+}
+
+export async function atualizarContaPagar(id: string, dados: any) {
+  await pool.query(
+    `UPDATE contas_pagar SET
+      fornecedor_id = $1, categoria_id = $2, descricao = $3, valor = $4,
+      data_vencimento = $5, status = $6, observacoes = $7,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $8`,
+    [dados.fornecedorId, dados.categoriaId, dados.descricao, dados.valor,
+     dados.dataVencimento, dados.status, dados.observacoes, id]
+  );
+  
+  return await obterContaPagar(id);
+}
+
+export async function removerContaPagar(id: string) {
+  await pool.query('DELETE FROM contas_pagar WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+export async function marcarContaPaga(id: string) {
+  await pool.query(
+    `UPDATE contas_pagar SET
+      status = 'paga',
+      data_pagamento = CURRENT_DATE,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1`,
+    [id]
+  );
+  
+  return await obterContaPagar(id);
+}
+
+// ========================================
+// FATURAS
+// ========================================
+
+export async function listarFaturas() {
+  const result = await pool.query(`
+    SELECT f.*, u.nome as utente_nome
+    FROM faturas f
+    LEFT JOIN utentes u ON f.utente_id = u.id
+    ORDER BY f.data_emissao DESC
+  `);
+  
+  return result.rows.map(row => ({
+    id: row.id,
+    numeroFatura: row.numero_fatura,
+    utenteId: row.utente_id,
+    utenteNome: row.utente_nome,
+    dataEmissao: row.data_emissao,
+    dataVencimento: row.data_vencimento,
+    valorTotal: parseFloat(row.valor_total),
+    valorPago: parseFloat(row.valor_pago),
+    status: row.status,
+    observacoes: row.observacoes,
+    criadoEm: row.created_at,
+  }));
+}
+
+export async function obterFatura(id: string) {
+  const result = await pool.query(
+    'SELECT * FROM faturas WHERE id = $1',
+    [id]
+  );
+  
+  if (result.rows.length === 0) return null;
+  
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    numeroFatura: row.numero_fatura,
+    utenteId: row.utente_id,
+    dataEmissao: row.data_emissao,
+    dataVencimento: row.data_vencimento,
+    valorTotal: parseFloat(row.valor_total),
+    valorPago: parseFloat(row.valor_pago),
+    status: row.status,
+    observacoes: row.observacoes,
+  };
+}
+
+export async function criarFatura(dados: any) {
+  const id = `fatura-${Date.now()}`;
+  
+  // Generate invoice number
+  const countResult = await pool.query('SELECT COUNT(*) FROM faturas');
+  const count = parseInt(countResult.rows[0].count) + 1;
+  const numeroFatura = dados.numeroFatura || `FT${new Date().getFullYear()}/${String(count).padStart(5, '0')}`;
+  
+  await pool.query(
+    `INSERT INTO faturas 
+     (id, numero_fatura, utente_id, data_emissao, data_vencimento, valor_total, valor_pago, status, observacoes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, numeroFatura, dados.utenteId, dados.dataEmissao, dados.dataVencimento,
+     dados.valorTotal, dados.valorPago || 0, dados.status || 'pendente', dados.observacoes]
+  );
+  
+  return await obterFatura(id);
+}
+
+export async function atualizarFatura(id: string, dados: any) {
+  await pool.query(
+    `UPDATE faturas SET
+      data_vencimento = $1, valor_total = $2, valor_pago = $3,
+      status = $4, observacoes = $5, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $6`,
+    [dados.dataVencimento, dados.valorTotal, dados.valorPago,
+     dados.status, dados.observacoes, id]
+  );
+  
+  return await obterFatura(id);
+}
+
+export async function removerFatura(id: string) {
+  await pool.query('DELETE FROM faturas WHERE id = $1', [id]);
+  return { sucesso: true };
+}
+
+// ========================================
+// DASHBOARD FINANCEIRO
+// ========================================
+
+export async function obterDashboardFinanceiro() {
+  const mesAtual = new Date();
+  const primeiroDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+  const ultimoDiaMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 0);
+  
+  // Receitas do mês (faturas pagas)
+  const receitasResult = await pool.query(
+    `SELECT COALESCE(SUM(valor_pago), 0) as total
+     FROM faturas
+     WHERE data_emissao >= $1 AND data_emissao <= $2`,
+    [primeiroDiaMes, ultimoDiaMes]
+  );
+  
+  // Despesas do mês (contas pagas)
+  const despesasResult = await pool.query(
+    `SELECT COALESCE(SUM(valor), 0) as total
+     FROM contas_pagar
+     WHERE data_pagamento >= $1 AND data_pagamento <= $2`,
+    [primeiroDiaMes, ultimoDiaMes]
+  );
+  
+  // Contas pendentes
+  const contasPendentesResult = await pool.query(
+    `SELECT COUNT(*) as total
+     FROM contas_pagar
+     WHERE status = 'pendente'`
+  );
+  
+  // Faturas emitidas no mês
+  const faturasResult = await pool.query(
+    `SELECT COUNT(*) as total
+     FROM faturas
+     WHERE data_emissao >= $1 AND data_emissao <= $2`,
+    [primeiroDiaMes, ultimoDiaMes]
+  );
+  
+  const receitas = parseFloat(receitasResult.rows[0].total);
+  const despesas = parseFloat(despesasResult.rows[0].total);
+  
+  return {
+    receitasMes: receitas,
+    despesasMes: despesas,
+    lucroMes: receitas - despesas,
+    contasPendentes: parseInt(contasPendentesResult.rows[0].total),
+    faturasEmitidas: parseInt(faturasResult.rows[0].total),
+  };
+}
+
