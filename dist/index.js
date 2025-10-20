@@ -471,24 +471,56 @@ async function criarConsulta(dados) {
   return await obterConsulta(id);
 }
 async function atualizarConsulta(id, dados) {
-  await pool.query(
-    `UPDATE consultas SET
-      utente_id = $1, dentista_id = $2, data_hora = $3, duracao = $4,
-      tipo = $5, status = $6, observacoes = $7, valor = $8,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = $9`,
-    [
-      dados.utenteId,
-      dados.dentistaId,
-      dados.dataHora,
-      dados.duracao,
-      dados.tipo,
-      dados.status,
-      dados.observacoes,
-      dados.valor,
-      id
-    ]
-  );
+  const campos = [];
+  const valores = [];
+  let paramIndex = 1;
+  if (dados.utenteId !== void 0) {
+    campos.push(`utente_id = $${paramIndex++}`);
+    valores.push(dados.utenteId);
+  }
+  if (dados.medicoId !== void 0) {
+    campos.push(`dentista_id = $${paramIndex++}`);
+    valores.push(dados.medicoId);
+  }
+  if (dados.dataHora !== void 0) {
+    campos.push(`data_hora = $${paramIndex++}`);
+    valores.push(dados.dataHora);
+  }
+  if (dados.duracao !== void 0) {
+    campos.push(`duracao = $${paramIndex++}`);
+    valores.push(dados.duracao);
+  }
+  if (dados.tipoConsulta !== void 0) {
+    campos.push(`tipo = $${paramIndex++}`);
+    valores.push(dados.tipoConsulta);
+  }
+  if (dados.procedimento !== void 0) {
+    campos.push(`procedimento = $${paramIndex++}`);
+    valores.push(dados.procedimento);
+  }
+  if (dados.status !== void 0) {
+    campos.push(`status = $${paramIndex++}`);
+    valores.push(dados.status);
+  }
+  if (dados.observacoes !== void 0) {
+    campos.push(`observacoes = $${paramIndex++}`);
+    valores.push(dados.observacoes);
+  }
+  if (dados.valorEstimado !== void 0) {
+    campos.push(`valor = $${paramIndex++}`);
+    valores.push(dados.valorEstimado);
+  }
+  if (dados.classificacaoRisco !== void 0) {
+    campos.push(`classificacao_risco = $${paramIndex++}`);
+    valores.push(dados.classificacaoRisco);
+  }
+  if (campos.length === 0) {
+    return await obterConsulta(id);
+  }
+  campos.push(`updated_at = CURRENT_TIMESTAMP`);
+  valores.push(id);
+  const query = `UPDATE consultas SET ${campos.join(", ")} WHERE id = $${paramIndex}`;
+  await pool.query(query, valores);
   return await obterConsulta(id);
 }
 async function removerConsulta(id) {

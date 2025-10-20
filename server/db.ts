@@ -429,15 +429,64 @@ export async function criarConsulta(dados: any) {
 }
 
 export async function atualizarConsulta(id: string, dados: any) {
-  await pool.query(
-    `UPDATE consultas SET
-      utente_id = $1, dentista_id = $2, data_hora = $3, duracao = $4,
-      tipo = $5, status = $6, observacoes = $7, valor = $8,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = $9`,
-    [dados.utenteId, dados.dentistaId, dados.dataHora, dados.duracao,
-     dados.tipo, dados.status, dados.observacoes, dados.valor, id]
-  );
+  const campos: string[] = [];
+  const valores: any[] = [];
+  let paramIndex = 1;
+
+  // Construir dinamicamente a query UPDATE
+  if (dados.utenteId !== undefined) {
+    campos.push(`utente_id = $${paramIndex++}`);
+    valores.push(dados.utenteId);
+  }
+  if (dados.medicoId !== undefined) {
+    campos.push(`dentista_id = $${paramIndex++}`);
+    valores.push(dados.medicoId);
+  }
+  if (dados.dataHora !== undefined) {
+    campos.push(`data_hora = $${paramIndex++}`);
+    valores.push(dados.dataHora);
+  }
+  if (dados.duracao !== undefined) {
+    campos.push(`duracao = $${paramIndex++}`);
+    valores.push(dados.duracao);
+  }
+  if (dados.tipoConsulta !== undefined) {
+    campos.push(`tipo = $${paramIndex++}`);
+    valores.push(dados.tipoConsulta);
+  }
+  if (dados.procedimento !== undefined) {
+    campos.push(`procedimento = $${paramIndex++}`);
+    valores.push(dados.procedimento);
+  }
+  if (dados.status !== undefined) {
+    campos.push(`status = $${paramIndex++}`);
+    valores.push(dados.status);
+  }
+  if (dados.observacoes !== undefined) {
+    campos.push(`observacoes = $${paramIndex++}`);
+    valores.push(dados.observacoes);
+  }
+  if (dados.valorEstimado !== undefined) {
+    campos.push(`valor = $${paramIndex++}`);
+    valores.push(dados.valorEstimado);
+  }
+  if (dados.classificacaoRisco !== undefined) {
+    campos.push(`classificacao_risco = $${paramIndex++}`);
+    valores.push(dados.classificacaoRisco);
+  }
+
+  // Se não há campos para atualizar, retornar a consulta atual
+  if (campos.length === 0) {
+    return await obterConsulta(id);
+  }
+
+  // Adicionar o ID como último parâmetro
+  campos.push(`updated_at = CURRENT_TIMESTAMP`);
+  valores.push(id);
+
+  const query = `UPDATE consultas SET ${campos.join(', ')} WHERE id = $${paramIndex}`;
+  
+  await pool.query(query, valores);
   
   return await obterConsulta(id);
 }
