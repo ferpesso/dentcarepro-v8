@@ -9,6 +9,49 @@ router.get('/init-database', async (req, res) => {
 
     const pool = await getDb();
 
+    // Criar tabela users
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        login_method VARCHAR(50),
+        role VARCHAR(50) DEFAULT 'user',
+        last_signed_in TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('✅ Tabela users criada!');
+
+    // Criar tabela config_clinica
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS config_clinica (
+        id VARCHAR(50) PRIMARY KEY,
+        nome_clinica VARCHAR(255),
+        razao_social VARCHAR(255),
+        nif VARCHAR(20),
+        numero_registo VARCHAR(50),
+        telefone VARCHAR(20),
+        telemovel VARCHAR(20),
+        email VARCHAR(255),
+        website VARCHAR(255),
+        rua TEXT,
+        numero VARCHAR(20),
+        complemento VARCHAR(100),
+        codigo_postal VARCHAR(20),
+        cidade VARCHAR(100),
+        pais VARCHAR(100) DEFAULT 'Portugal',
+        nome_fantasia VARCHAR(255),
+        logotipo TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log('✅ Tabela config_clinica criada!');
+
     // Criar tabela de utentes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS utentes (
@@ -52,6 +95,30 @@ router.get('/init-database', async (req, res) => {
     const countResult = await pool.query('SELECT COUNT(*) as count FROM utentes');
     const count = parseInt(countResult.rows[0]?.count || '0');
 
+    // Inserir configuração padrão da clínica se não existir
+    const configResult = await pool.query('SELECT COUNT(*) as count FROM config_clinica');
+    const configCount = parseInt(configResult.rows[0]?.count || '0');
+    
+    if (configCount === 0) {
+      await pool.query(`
+        INSERT INTO config_clinica (id, nome_clinica, email, cidade, pais)
+        VALUES ('config-1', 'Clínica Dentária', 'geral@clinica.pt', 'Lisboa', 'Portugal')
+      `);
+      console.log('✅ Configuração padrão da clínica criada!');
+    }
+
+    // Inserir utilizador demo se não existir
+    const userResult = await pool.query('SELECT COUNT(*) as count FROM users');
+    const userCount = parseInt(userResult.rows[0]?.count || '0');
+    
+    if (userCount === 0) {
+      await pool.query(`
+        INSERT INTO users (id, name, email, login_method, role, last_signed_in)
+        VALUES ('user-demo', 'Utilizador de Desenvolvimento', 'demo@dentcarepro.pt', 'demo', 'admin', CURRENT_TIMESTAMP)
+      `);
+      console.log('✅ Utilizador demo criado!');
+    }
+
     if (count === 0) {
       // Inserir dados de demonstração
       await pool.query(`
@@ -75,10 +142,18 @@ router.get('/init-database', async (req, res) => {
     const finalCountResult = await pool.query('SELECT COUNT(*) as count FROM utentes');
     const finalCount = parseInt(finalCountResult.rows[0]?.count || '0');
 
+    // Contar todas as tabelas
+    const usersFinalCount = await pool.query('SELECT COUNT(*) as count FROM users');
+    const configFinalCount = await pool.query('SELECT COUNT(*) as count FROM config_clinica');
+
     res.json({
       success: true,
       message: 'Base de dados inicializada com sucesso!',
-      utentes_count: finalCount
+      tables: {
+        users: parseInt(usersFinalCount.rows[0]?.count || '0'),
+        config_clinica: parseInt(configFinalCount.rows[0]?.count || '0'),
+        utentes: finalCount
+      }
     });
 
   } catch (error: any) {
