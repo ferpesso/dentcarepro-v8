@@ -6,15 +6,11 @@ const { Pool } = pg;
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
-  host: 'localhost',
-  port: 5432,
-  database: 'dentcarepro',
-  user: 'dentcarepro',
-  password: 'dentcare2025',
+  connectionString: process.env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  ssl: false,
+  connectionTimeoutMillis: 10000,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
 // Test connection
