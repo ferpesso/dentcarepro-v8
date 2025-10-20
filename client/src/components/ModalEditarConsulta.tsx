@@ -106,7 +106,7 @@ export default function ModalEditarConsulta({
 
     setLoading(true);
     try {
-      const dataHora = `${formData.data}T${formData.hora}:00`;
+      const dataHora = `${formData.data}T${formData.hora}:00Z`;
       
       await onSave(consulta.id, {
         utenteId: formData.utenteId,
