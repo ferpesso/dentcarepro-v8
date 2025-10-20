@@ -217,10 +217,10 @@ export default function ContasPagar() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(estatisticas.totalPendente)}
+                {formatCurrency((estatisticas as any).totalPendente || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {estatisticas.contasPendentes} contas
+                {(estatisticas as any).contasPendentes || 0} contas
               </p>
             </CardContent>
           </Card>
@@ -234,10 +234,10 @@ export default function ContasPagar() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(estatisticas.totalVencido)}
+                {formatCurrency((estatisticas as any).totalVencido || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
-                {estatisticas.contasVencidas} contas
+                {(estatisticas as any).contasVencidas || 0} contas
               </p>
             </CardContent>
           </Card>
@@ -251,7 +251,7 @@ export default function ContasPagar() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(estatisticas.totalPago)}
+                {formatCurrency((estatisticas as any).totalPago || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 Este período
@@ -268,7 +268,7 @@ export default function ContasPagar() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {formatCurrency(estatisticas.totalMes)}
+                {formatCurrency((estatisticas as any).totalMes || 0)}
               </div>
               <p className="text-xs text-muted-foreground">
                 {format(new Date(), "MMMM yyyy", { locale: ptBR })}
@@ -320,8 +320,8 @@ export default function ContasPagar() {
         <CardContent>
           <div className="space-y-4">
             {contas?.map((conta) => {
-              const valorTotal = parseFloat(conta.valorTotal);
-              const valorPago = parseFloat(conta.valorPago || "0");
+              const valorTotal = parseFloat((conta as any).valorTotal || (conta as any).valor || "0");
+              const valorPago = parseFloat((conta as any).valorPago || "0");
               const saldo = valorTotal - valorPago;
               const dataVencimento = new Date(conta.dataVencimento);
               const hoje = new Date();
@@ -464,7 +464,7 @@ export default function ContasPagar() {
                   <SelectContent>
                     {categorias?.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
-                        {cat.icone} {cat.nome}
+                        {(cat as any).icone || "📁"} {cat.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>

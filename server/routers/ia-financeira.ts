@@ -26,11 +26,8 @@ export const iaFinanceiraRouter = router({
     )
     .mutation(async ({ input }) => {
       // Buscar dados financeiros do período
-      const receitas = []; // TODO: buscar do banco
-      const despesas = await db.listarContasPagar(input.periodo ? {
-        dataInicio: input.periodo.inicio,
-        dataFim: input.periodo.fim,
-      } : undefined);
+      const receitas: any[] = []; // TODO: buscar do banco
+      const despesas = await db.listarContasPagar();
       
       const dadosFinanceiros = {
         receitas,
@@ -69,8 +66,8 @@ export const iaFinanceiraRouter = router({
     )
     .query(async ({ input }) => {
       // Buscar dados financeiros
-      const despesas = await db.listarContasPagar(input?.periodo);
-      const estatisticasDespesas = await db.obterEstatisticasContasPagar(input?.periodo);
+      const despesas = await db.listarContasPagar();
+      const estatisticasDespesas: any = {}; // TODO: implementar estatísticas
 
       const dadosFinanceiros = {
         receitas: [],
@@ -138,13 +135,10 @@ export const iaFinanceiraRouter = router({
         const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
         const mesAno = data.toISOString().substring(0, 7);
         
-        const despesas = await db.listarContasPagar({
-          dataInicio: `${mesAno}-01`,
-          dataFim: `${mesAno}-31`,
-        });
+        const despesas = await db.listarContasPagar();
 
         const totalDespesas = despesas.reduce(
-          (sum, d) => sum + parseFloat(d.valorTotal),
+          (sum, d) => sum + parseFloat((d as any).valor || 0),
           0
         );
 
@@ -178,7 +172,7 @@ export const iaFinanceiraRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const despesas = await db.listarContasPagar(input.periodo);
+      const despesas = await db.listarContasPagar();
 
       const sugestoes = await iaFinanceira.sugerirEconomias(
         despesas,

@@ -404,7 +404,7 @@ export default function IAFinanceira() {
       {/* Gráficos Interativos */}
       <div className="mt-8">
         <GraficosFinanceiros
-          dados={tendencias?.dadosHistoricos || []}
+          dados={(tendencias?.dadosHistoricos || []) as any}
           periodo="Últimos 6 meses"
         />
       </div>

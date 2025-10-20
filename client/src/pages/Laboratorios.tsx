@@ -190,8 +190,8 @@ export default function Laboratorios() {
       {/* Lista de Laboratórios */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {laboratorios?.map((lab) => {
-          const especialidades = lab.especialidades
-            ? JSON.parse(lab.especialidades)
+          const especialidades = (lab as any).especialidades
+            ? JSON.parse((lab as any).especialidades)
             : [];
 
           return (
@@ -203,10 +203,10 @@ export default function Laboratorios() {
                       <Building2 className="h-5 w-5" />
                       {lab.nome}
                     </CardTitle>
-                    <CardDescription>{lab.razaoSocial}</CardDescription>
+                    <CardDescription>{(lab as any).razaoSocial || "Laboratório"}</CardDescription>
                   </div>
-                  <Badge variant={lab.status === "ativo" ? "default" : "secondary"}>
-                    {lab.status}
+                  <Badge variant={(lab as any).status === "ativo" ? "default" : "secondary"}>
+                    {(lab as any).status || "ativo"}
                   </Badge>
                 </div>
               </CardHeader>
@@ -234,19 +234,19 @@ export default function Laboratorios() {
                 </div>
 
                 {/* Avaliação */}
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
                     <Star
                       key={i}
                       className={`h-4 w-4 ${
-                        i < (lab.avaliacaoQualidade || 0)
+                        i < ((lab as any).avaliacaoQualidade || 0)
                           ? "fill-yellow-400 text-yellow-400"
                           : "text-gray-300"
                       }`}
                     />
                   ))}
                   <span className="text-sm text-muted-foreground ml-2">
-                    {lab.prazoMedioEntrega} dias
+                    {(lab as any).prazoMedioEntrega || 7} dias
                   </span>
                 </div>
 

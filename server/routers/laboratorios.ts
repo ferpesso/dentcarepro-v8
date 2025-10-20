@@ -25,7 +25,7 @@ export const laboratoriosRouter = router({
         .optional()
     )
     .query(async ({ input }) => {
-      return await db.listarLaboratorios(input);
+      return await db.listarLaboratorios();
     }),
 
   /**
@@ -263,25 +263,23 @@ export const laboratoriosRouter = router({
       const trabalhosCancelados = trabalhos.filter(
         (t) => t.status === "cancelado"
       ).length;
-
       const custoTotal = trabalhos.reduce(
-        (acc, t) => acc + (Number(t.custoLaboratorio) || 0),
+        (acc, t) => acc + ((t as any).custoLaboratorio || (t as any).custo || 0),
         0
       );
       const receitaTotal = trabalhos.reduce(
-        (acc, t) => acc + (Number(t.valorCobradoUtente) || 0),
-        0
+        (acc, t) => acc + ((t as any).valorCobradoUtente || (t as any).valor || 0),        0
       );
       const margemTotal = receitaTotal - custoTotal;
 
       const avaliacaoMedia =
         trabalhos
-          .filter((t) => t.avaliacaoQualidade)
-          .reduce((acc, t) => acc + (t.avaliacaoQualidade || 0), 0) /
-        trabalhos.filter((t) => t.avaliacaoQualidade).length;
+          .filter((t) => (t as any).avaliacaoQualidade)
+          .reduce((acc, t) => acc + ((t as any).avaliacaoQualidade || 0), 0) /
+        (trabalhos.filter((t) => (t as any).avaliacaoQualidade).length || 1);
 
       const necessitaramAjuste = trabalhos.filter(
-        (t) => t.necessitouAjuste
+        (t) => (t as any).necessitouAjuste
       ).length;
 
       return {

@@ -297,7 +297,10 @@ class SDKServer {
       lastSignedIn: signedInAt,
     });
 
-    return user;
+    return {
+      ...user,
+      createdAt: (user as any).createdAt || new Date(),
+    };
   }
 }
 
