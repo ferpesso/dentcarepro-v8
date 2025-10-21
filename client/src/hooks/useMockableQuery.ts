@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { mockUtentesAPI, mockConsultasAPI } from "@/lib/mockData";
 
 // Flag para forçar uso de mock (útil para desenvolvimento)
-const FORCE_MOCK = true; // ✅ ATIVADO: Desenvolvendo com mock, Railway depois
+const FORCE_MOCK = false; // ❌ DESATIVADO: Testando Railway com custom fetch
 
 /**
  * Hook para queries que fallback para mock data quando backend não está disponível
