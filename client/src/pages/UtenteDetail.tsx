@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useUtente } from "@/hooks/useMockableQuery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,10 +44,7 @@ export default function UtenteDetail() {
 
   const utenteId = params?.id;
 
-  const { data: utente, isLoading, error } = trpc.utentes.obter.useQuery(
-    { id: utenteId! },
-    { enabled: !!utenteId }
-  );
+  const { data: utente, isLoading, error } = useUtente(utenteId!);
 
   // Calcular idade
   const calcularIdade = (dataNascimento: string) => {
