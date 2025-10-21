@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "framework": null,
+  "installCommand": "pnpm install",
+  "devCommand": "pnpm dev",
+  "env": {
+    "NODE_ENV": "production",
+    "VITE_API_URL": "https://web-production-1be3.up.railway.app",
+    "VITE_APP_ID": "dentcarepro_v8",
+    "VITE_APP_TITLE": "DentCare PRO",
+    "VITE_APP_LOGO": "https://placehold.co/40x40/3b82f6/ffffff?text=DC"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production",
+      "VITE_API_URL": "https://web-production-1be3.up.railway.app"
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+

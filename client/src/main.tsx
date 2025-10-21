@@ -32,10 +32,17 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// Configuração da URL da API
+// Em desenvolvimento: usa proxy local (/api/trpc)
+// Em produção: usa URL do Railway (variável de ambiente)
+const apiUrl = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api/trpc`
+  : "/api/trpc";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl,
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
