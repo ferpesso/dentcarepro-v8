@@ -1,11 +1,11 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
-import superjson from "superjson";
+// import superjson from "superjson"; // ❌ REMOVIDO TEMPORARIAMENTE
 import type { TrpcContext } from "./context";
 import * as db from "../db";
 
 const t = initTRPC.context<TrpcContext>().create({
-  transformer: superjson,
+  // transformer: superjson, // ❌ REMOVIDO TEMPORARIAMENTE
 });
 
 export const router = t.router;

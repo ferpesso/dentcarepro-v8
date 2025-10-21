@@ -3,7 +3,7 @@ import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
-import superjson from "superjson";
+// import superjson from "superjson"; // ❌ REMOVIDO TEMPORARIAMENTE
 import App from "./App";
 // getLoginUrl removido - OAuth desativado
 import "./index.css";
@@ -49,7 +49,7 @@ const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: apiUrl,
-      transformer: superjson,
+      // transformer: superjson, // ❌ REMOVIDO TEMPORARIAMENTE PARA TESTAR
       fetch(input, init) {
         console.log('[tRPC] Fetch request:', input);
         return globalThis.fetch(input, {
