@@ -12,8 +12,8 @@ const apiUrl = import.meta.env.VITE_API_URL
 /**
  * Cliente tRPC Vanilla (não-React) para uso em funções assíncronas
  * 
- * Este cliente é usado dentro do hook useMockableQuery para fazer
- * chamadas à API de forma programática, com fallback para dados mock.
+ * Este cliente é usado dentro dos hooks (useUtentes, useConsultas, etc)
+ * para fazer chamadas à API de forma programática.
  * 
  * Para uso em componentes React, use o cliente React do @/lib/trpc
  */

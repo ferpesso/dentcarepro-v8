@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useUtente } from "@/hooks/useMockableQuery";
+import { useUtente } from "@/hooks/useUtentes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
