@@ -1,14 +1,8 @@
 // @ts-nocheck
 import React, { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  useConsultasPorPeriodo, 
-  useUtentes, 
-  useConsultasStats,
-  useCriarConsulta,
-  useAtualizarConsulta,
-  useRemoverConsulta
-} from "@/hooks/useMockableQuery";
+import { useConsultasPorPeriodo, useConsultasStats, useCriarConsulta, useAtualizarConsulta, useRemoverConsulta } from "@/hooks/useConsultas";
+import { useUtentes } from "@/hooks/useUtentes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
