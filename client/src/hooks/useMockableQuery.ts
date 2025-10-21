@@ -19,15 +19,29 @@ export function useMockableQuery<TData>(
     queryKey,
     queryFn: async () => {
       if (FORCE_MOCK) {
+        console.log('[useMockableQuery] Usando mock (FORCE_MOCK=true)');
         return mockFn();
       }
       
       try {
-        return await queryFn();
+        console.log('[useMockableQuery] Chamando backend:', queryKey);
+        const result = await queryFn();
+        console.log('[useMockableQuery] Sucesso:', queryKey, result);
+        return result;
       } catch (error: any) {
+        console.error('[useMockableQuery] Erro ao chamar backend:', error);
+        console.error('[useMockableQuery] Detalhes do erro:', {
+          message: error?.message,
+          name: error?.name,
+          stack: error?.stack
+        });
+        
         // Se erro de rede ou parsing, usa mock
-        if (error?.message?.includes('JSON') || error?.message?.includes('fetch')) {
-          console.warn('Backend indisponível, usando dados mock');
+        if (error?.message?.includes('JSON') || 
+            error?.message?.includes('fetch') ||
+            error?.message?.includes('network') ||
+            error?.message?.includes('Failed to fetch')) {
+          console.warn('[useMockableQuery] Backend indisponível, usando dados mock');
           return mockFn();
         }
         throw error;
@@ -48,14 +62,23 @@ export function useMockableMutation<TData, TVariables>(
   return useMutation({
     mutationFn: async (variables: TVariables) => {
       if (FORCE_MOCK) {
+        console.log('[useMockableMutation] Usando mock (FORCE_MOCK=true)');
         return mockFn(variables);
       }
       
       try {
-        return await mutationFn(variables);
+        console.log('[useMockableMutation] Chamando backend');
+        const result = await mutationFn(variables);
+        console.log('[useMockableMutation] Sucesso');
+        return result;
       } catch (error: any) {
-        if (error?.message?.includes('JSON') || error?.message?.includes('fetch')) {
-          console.warn('Backend indisponível, usando operação mock');
+        console.error('[useMockableMutation] Erro:', error);
+        
+        if (error?.message?.includes('JSON') || 
+            error?.message?.includes('fetch') ||
+            error?.message?.includes('network') ||
+            error?.message?.includes('Failed to fetch')) {
+          console.warn('[useMockableMutation] Backend indisponível, usando operação mock');
           return mockFn(variables);
         }
         throw error;
@@ -69,7 +92,17 @@ export function useMockableMutation<TData, TVariables>(
 export function useUtentes() {
   return useMockableQuery(
     ['utentes'],
-    () => trpc.utentes.listar.query(),
+    () => {
+      console.log('[useUtentes] Iniciando query');
+      try {
+        const result = trpc.utentes.listar.query();
+        console.log('[useUtentes] Query criada');
+        return result;
+      } catch (error) {
+        console.error('[useUtentes] Erro ao criar query:', error);
+        throw error;
+      }
+    },
     () => mockUtentesAPI.listar()
   );
 }

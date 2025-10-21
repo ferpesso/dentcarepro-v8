@@ -39,15 +39,28 @@ const apiUrl = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/trpc`
   : "/api/trpc";
 
+console.log('[tRPC] Configuração da API:', {
+  apiUrl,
+  env: import.meta.env.MODE,
+  VITE_API_URL: import.meta.env.VITE_API_URL
+});
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: apiUrl,
       transformer: superjson,
       fetch(input, init) {
+        console.log('[tRPC] Fetch request:', input);
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
+        }).then(response => {
+          console.log('[tRPC] Fetch response:', response.status, response.statusText);
+          return response;
+        }).catch(error => {
+          console.error('[tRPC] Fetch error:', error);
+          throw error;
         });
       },
     }),
@@ -61,3 +74,4 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
