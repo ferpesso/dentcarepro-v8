@@ -18,6 +18,8 @@ import { odontogramaRouter } from "./routers/odontograma";
 import { periodontogramaRouter } from "./routers/periodontograma";
 import { bloqueiosAgendaRouter } from "./routers/bloqueios-agenda";
 import { listaEsperaRouter } from "./routers/lista-espera";
+import { portalPacienteRouter } from "./routers/portal-paciente";
+import { relatoriosRouter } from "./routers/relatorios";
 
 export const appRouter = router({
   system: systemRouter,
@@ -583,6 +585,16 @@ export const appRouter = router({
   // LISTA DE ESPERA
   // ========================================
   listaEspera: listaEsperaRouter,
+
+  // ========================================
+  // PORTAL DO PACIENTE
+  // ========================================
+  portalPaciente: portalPacienteRouter,
+
+  // ========================================
+  // RELATÓRIOS
+  // ========================================
+  relatorios: relatoriosRouter,
 });
 
 export type AppRouter = typeof appRouter;

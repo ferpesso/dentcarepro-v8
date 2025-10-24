@@ -3854,3 +3854,642 @@ export async function sugerirProximosListaEspera(filtros: {
   return result.rows;
 }
 
+
+
+// ============================================================================
+// PORTAL DO PACIENTE
+// ============================================================================
+
+interface DashboardPaciente {
+  consultasAgendadas: number;
+  faturasPendentes: number;
+  mensagensNovas: number;
+  documentos: number;
+  proximaConsulta?: {
+    data: string;
+    hora: string;
+    dentista: string;
+    tipo: string;
+  };
+  ultimoTratamento?: {
+    data: string;
+    procedimento: string;
+  };
+}
+
+interface ConsultaPaciente {
+  id: string;
+  data: string;
+  hora: string;
+  dentistaId: string;
+  dentistaNome: string;
+  tipo: string;
+  status: string;
+  observacoes?: string;
+}
+
+interface FaturaPaciente {
+  id: string;
+  numero: string;
+  data: string;
+  valor: number;
+  valorPago: number;
+  status: string;
+  dataVencimento?: string;
+  itens: Array<{
+    descricao: string;
+    quantidade: number;
+    valorUnitario: number;
+    total: number;
+  }>;
+}
+
+interface MensagemPaciente {
+  id: string;
+  assunto: string;
+  mensagem: string;
+  remetenteId: string;
+  remetenteNome: string;
+  data: string;
+  lida: boolean;
+  resposta?: string;
+  dataResposta?: string;
+}
+
+interface DocumentoPaciente {
+  id: string;
+  tipo: string;
+  titulo: string;
+  data: string;
+  url?: string;
+  conteudo?: any;
+}
+
+/**
+ * Obter dashboard do paciente
+ */
+export async function obterDashboardPaciente(utenteId: string): Promise<DashboardPaciente> {
+  if (useMockData) {
+    return {
+      consultasAgendadas: 2,
+      faturasPendentes: 1,
+      mensagensNovas: 0,
+      documentos: 5,
+      proximaConsulta: {
+        data: "2025-10-30",
+        hora: "14:30",
+        dentista: "Dr. João Silva",
+        tipo: "Consulta de rotina",
+      },
+      ultimoTratamento: {
+        data: "2025-10-15",
+        procedimento: "Limpeza dentária",
+      },
+    };
+  }
+
+  // Implementação PostgreSQL aqui
+  return {
+    consultasAgendadas: 0,
+    faturasPendentes: 0,
+    mensagensNovas: 0,
+    documentos: 0,
+  };
+}
+
+/**
+ * Listar consultas do paciente
+ */
+export async function listarConsultasPaciente(filtros: {
+  utenteId: string;
+  status?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<ConsultaPaciente[]> {
+  if (useMockData) {
+    return [
+      {
+        id: "cons_1",
+        data: "2025-10-30",
+        hora: "14:30",
+        dentistaId: "1",
+        dentistaNome: "Dr. João Silva",
+        tipo: "Consulta de rotina",
+        status: "agendada",
+      },
+      {
+        id: "cons_2",
+        data: "2025-11-15",
+        hora: "10:00",
+        dentistaId: "1",
+        dentistaNome: "Dr. João Silva",
+        tipo: "Tratamento de canal",
+        status: "agendada",
+      },
+    ];
+  }
+
+  return [];
+}
+
+/**
+ * Cancelar consulta do paciente
+ */
+export async function cancelarConsultaPaciente(dados: {
+  consultaId: string;
+  motivoCancelamento?: string;
+  canceladoPor: string;
+}): Promise<boolean> {
+  if (useMockData) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Listar faturas do paciente
+ */
+export async function listarFaturasPaciente(filtros: {
+  utenteId: string;
+  status?: string;
+}): Promise<FaturaPaciente[]> {
+  if (useMockData) {
+    return [
+      {
+        id: "fat_1",
+        numero: "2025/001",
+        data: "2025-10-15",
+        valor: 150,
+        valorPago: 0,
+        status: "pendente",
+        dataVencimento: "2025-11-15",
+        itens: [
+          {
+            descricao: "Limpeza dentária",
+            quantidade: 1,
+            valorUnitario: 80,
+            total: 80,
+          },
+          {
+            descricao: "Consulta",
+            quantidade: 1,
+            valorUnitario: 70,
+            total: 70,
+          },
+        ],
+      },
+    ];
+  }
+
+  return [];
+}
+
+/**
+ * Obter fatura do paciente
+ */
+export async function obterFaturaPaciente(faturaId: string): Promise<FaturaPaciente | null> {
+  if (useMockData) {
+    const faturas = await listarFaturasPaciente({ utenteId: "1" });
+    return faturas.find((f) => f.id === faturaId) || null;
+  }
+
+  return null;
+}
+
+/**
+ * Listar mensagens do paciente
+ */
+export async function listarMensagensPaciente(filtros: {
+  utenteId: string;
+  lidas?: boolean;
+}): Promise<MensagemPaciente[]> {
+  if (useMockData) {
+    return [];
+  }
+
+  return [];
+}
+
+/**
+ * Enviar mensagem do paciente
+ */
+export async function enviarMensagemPaciente(dados: {
+  utenteId: string;
+  assunto: string;
+  mensagem: string;
+  remetenteId: string;
+}): Promise<MensagemPaciente> {
+  if (useMockData) {
+    return {
+      id: `msg_${Date.now()}`,
+      assunto: dados.assunto,
+      mensagem: dados.mensagem,
+      remetenteId: dados.remetenteId,
+      remetenteNome: "Paciente",
+      data: new Date().toISOString(),
+      lida: false,
+    };
+  }
+
+  throw new Error("Not implemented");
+}
+
+/**
+ * Marcar mensagem como lida
+ */
+export async function marcarMensagemLida(mensagemId: string): Promise<boolean> {
+  if (useMockData) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Listar documentos do paciente
+ */
+export async function listarDocumentosPaciente(filtros: {
+  utenteId: string;
+  tipo?: string;
+}): Promise<DocumentoPaciente[]> {
+  if (useMockData) {
+    return [
+      {
+        id: "doc_1",
+        tipo: "prescricoes",
+        titulo: "Prescrição - Amoxicilina",
+        data: "2025-10-15",
+      },
+      {
+        id: "doc_2",
+        tipo: "exames",
+        titulo: "Raio-X Panorâmico",
+        data: "2025-09-20",
+      },
+    ];
+  }
+
+  return [];
+}
+
+/**
+ * Obter documento do paciente
+ */
+export async function obterDocumentoPaciente(
+  documentoId: string
+): Promise<DocumentoPaciente | null> {
+  if (useMockData) {
+    const docs = await listarDocumentosPaciente({ utenteId: "1" });
+    return docs.find((d) => d.id === documentoId) || null;
+  }
+
+  return null;
+}
+
+/**
+ * Obter histórico clínico resumido do paciente
+ */
+export async function obterHistoricoClinicoPaciente(utenteId: string): Promise<{
+  tratamentos: number;
+  consultas: number;
+  ultimaConsulta?: string;
+  alergias?: string[];
+  condicoes?: string[];
+}> {
+  if (useMockData) {
+    return {
+      tratamentos: 12,
+      consultas: 24,
+      ultimaConsulta: "2025-10-15",
+      alergias: ["Penicilina"],
+      condicoes: [],
+    };
+  }
+
+  return {
+    tratamentos: 0,
+    consultas: 0,
+  };
+}
+
+// ============================================================================
+// RELATÓRIOS
+// ============================================================================
+
+interface RelatorioConsultas {
+  periodo: { inicio: string; fim: string };
+  total: number;
+  realizadas: number;
+  canceladas: number;
+  faltou: number;
+  porDentista: Array<{
+    dentistaId: string;
+    dentistaNome: string;
+    total: number;
+    realizadas: number;
+  }>;
+  porDia: Array<{
+    data: string;
+    total: number;
+  }>;
+}
+
+interface RelatorioFinanceiro {
+  periodo: { inicio: string; fim: string };
+  faturamentoTotal: number;
+  recebido: number;
+  pendente: number;
+  porFormaPagamento: Array<{
+    forma: string;
+    valor: number;
+  }>;
+  porDentista: Array<{
+    dentistaId: string;
+    dentistaNome: string;
+    faturamento: number;
+  }>;
+  evolucaoMensal: Array<{
+    mes: string;
+    faturamento: number;
+    recebido: number;
+  }>;
+}
+
+/**
+ * Gerar relatório de consultas
+ */
+export async function gerarRelatorioConsultas(filtros: {
+  dataInicio: string;
+  dataFim: string;
+  dentistaId?: string;
+  status?: string;
+}): Promise<RelatorioConsultas> {
+  if (useMockData) {
+    return {
+      periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+      total: 45,
+      realizadas: 38,
+      canceladas: 5,
+      faltou: 2,
+      porDentista: [
+        {
+          dentistaId: "1",
+          dentistaNome: "Dr. João Silva",
+          total: 30,
+          realizadas: 26,
+        },
+        {
+          dentistaId: "2",
+          dentistaNome: "Dra. Maria Santos",
+          total: 15,
+          realizadas: 12,
+        },
+      ],
+      porDia: [
+        { data: "2025-10-20", total: 8 },
+        { data: "2025-10-21", total: 10 },
+        { data: "2025-10-22", total: 9 },
+      ],
+    };
+  }
+
+  return {
+    periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+    total: 0,
+    realizadas: 0,
+    canceladas: 0,
+    faltou: 0,
+    porDentista: [],
+    porDia: [],
+  };
+}
+
+/**
+ * Gerar relatório financeiro
+ */
+export async function gerarRelatorioFinanceiro(filtros: {
+  dataInicio: string;
+  dataFim: string;
+  tipo?: string;
+}): Promise<RelatorioFinanceiro> {
+  if (useMockData) {
+    return {
+      periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+      faturamentoTotal: 12500,
+      recebido: 9800,
+      pendente: 2700,
+      porFormaPagamento: [
+        { forma: "Dinheiro", valor: 4500 },
+        { forma: "Multibanco", valor: 3200 },
+        { forma: "MB WAY", valor: 2100 },
+      ],
+      porDentista: [
+        {
+          dentistaId: "1",
+          dentistaNome: "Dr. João Silva",
+          faturamento: 8000,
+        },
+        {
+          dentistaId: "2",
+          dentistaNome: "Dra. Maria Santos",
+          faturamento: 4500,
+        },
+      ],
+      evolucaoMensal: [
+        { mes: "2025-08", faturamento: 11200, recebido: 10800 },
+        { mes: "2025-09", faturamento: 13400, recebido: 12900 },
+        { mes: "2025-10", faturamento: 12500, recebido: 9800 },
+      ],
+    };
+  }
+
+  return {
+    periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+    faturamentoTotal: 0,
+    recebido: 0,
+    pendente: 0,
+    porFormaPagamento: [],
+    porDentista: [],
+    evolucaoMensal: [],
+  };
+}
+
+/**
+ * Gerar relatório de tratamentos
+ */
+export async function gerarRelatorioTratamentos(filtros: {
+  dataInicio: string;
+  dataFim: string;
+  dentistaId?: string;
+  status?: string;
+}): Promise<any> {
+  if (useMockData) {
+    return {
+      periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+      total: 32,
+      planeado: 8,
+      emCurso: 12,
+      concluido: 10,
+      cancelado: 2,
+      porTipo: [
+        { tipo: "Restauração", quantidade: 12, valor: 4800 },
+        { tipo: "Limpeza", quantidade: 8, valor: 640 },
+        { tipo: "Tratamento de canal", quantidade: 6, valor: 3600 },
+      ],
+    };
+  }
+
+  return {
+    periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+    total: 0,
+    planeado: 0,
+    emCurso: 0,
+    concluido: 0,
+    cancelado: 0,
+    porTipo: [],
+  };
+}
+
+/**
+ * Gerar relatório de pacientes
+ */
+export async function gerarRelatorioPacientes(filtros: {
+  tipo: string;
+  dataInicio?: string;
+  dataFim?: string;
+  mes?: number;
+}): Promise<any> {
+  if (useMockData) {
+    if (filtros.tipo === "novos") {
+      return {
+        total: 15,
+        pacientes: [
+          { id: "1", nome: "João Silva", dataCadastro: "2025-10-15" },
+          { id: "2", nome: "Maria Santos", dataCadastro: "2025-10-18" },
+        ],
+      };
+    }
+
+    if (filtros.tipo === "aniversariantes" && filtros.mes) {
+      return {
+        mes: filtros.mes,
+        total: 8,
+        pacientes: [
+          { id: "1", nome: "João Silva", dataNascimento: "1985-11-05" },
+          { id: "2", nome: "Maria Santos", dataNascimento: "1990-11-12" },
+        ],
+      };
+    }
+
+    return {
+      total: 0,
+      pacientes: [],
+    };
+  }
+
+  return {
+    total: 0,
+    pacientes: [],
+  };
+}
+
+/**
+ * Gerar relatório de produtividade
+ */
+export async function gerarRelatorioProdutividade(filtros: {
+  dataInicio: string;
+  dataFim: string;
+  dentistaId?: string;
+}): Promise<any> {
+  if (useMockData) {
+    return {
+      periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+      consultasPorDia: 8.5,
+      horasTrabalhadasPorDia: 7.2,
+      taxaOcupacao: 85,
+      faturamentoPorHora: 125,
+      porDentista: [
+        {
+          dentistaId: "1",
+          dentistaNome: "Dr. João Silva",
+          consultas: 120,
+          horasTrabalhadas: 180,
+          faturamento: 24000,
+        },
+      ],
+    };
+  }
+
+  return {
+    periodo: { inicio: filtros.dataInicio, fim: filtros.dataFim },
+    consultasPorDia: 0,
+    horasTrabalhadasPorDia: 0,
+    taxaOcupacao: 0,
+    faturamentoPorHora: 0,
+    porDentista: [],
+  };
+}
+
+/**
+ * Gerar dashboard executivo
+ */
+export async function gerarDashboardExecutivo(filtros: {
+  periodo: string;
+  dataReferencia?: string;
+}): Promise<any> {
+  if (useMockData) {
+    return {
+      periodo: filtros.periodo,
+      kpis: {
+        faturamento: 12500,
+        consultasRealizadas: 38,
+        novosPacientes: 5,
+        taxaCancelamento: 11,
+        ticketMedio: 329,
+        taxaOcupacao: 85,
+      },
+      comparacaoPeriodoAnterior: {
+        faturamento: 8.5, // % crescimento
+        consultas: 12.3,
+        pacientes: -2.1,
+      },
+      alertas: [
+        {
+          tipo: "atencao",
+          mensagem: "Taxa de cancelamento acima da média (11% vs 8%)",
+        },
+        {
+          tipo: "sucesso",
+          mensagem: "Faturamento cresceu 8.5% em relação ao período anterior",
+        },
+      ],
+    };
+  }
+
+  return {
+    periodo: filtros.periodo,
+    kpis: {},
+    comparacaoPeriodoAnterior: {},
+    alertas: [],
+  };
+}
+
+/**
+ * Exportar relatório
+ */
+export async function exportarRelatorio(dados: {
+  tipo: string;
+  formato: string;
+  parametros: any;
+}): Promise<{ url: string; nome: string }> {
+  if (useMockData) {
+    return {
+      url: `/relatorios/${dados.tipo}_${Date.now()}.${dados.formato}`,
+      nome: `relatorio_${dados.tipo}.${dados.formato}`,
+    };
+  }
+
+  throw new Error("Not implemented");
+}
+
