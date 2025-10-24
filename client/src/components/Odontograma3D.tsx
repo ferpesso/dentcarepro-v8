@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,41 @@ export default function Odontograma3D({ utenteId, dados = [], onSalvar }: Odonto
     dados.reduce((acc, d) => ({ ...acc, [d.numeroDente]: d }), {})
   );
 
+  // Queries
+  const { data: odontograma, refetch } = trpc.odontograma.obter.useQuery(
+    { utenteId },
+    { enabled: !!utenteId }
+  );
+  const { data: estatisticas } = trpc.odontograma.estatisticas.useQuery(
+    { utenteId },
+    { enabled: !!utenteId }
+  );
+
+  // Mutations
+  const salvarMutation = trpc.odontograma.salvar.useMutation({
+    onSuccess: () => {
+      toast.success("Odontograma salvo com sucesso!");
+      refetch();
+      if (onSalvar) {
+        onSalvar(Object.values(estadosDentes));
+      }
+    },
+    onError: (error) => {
+      toast.error(`Erro ao salvar: ${error.message}`);
+    },
+  });
+
+  // Carregar dados do backend
+  useEffect(() => {
+    if (odontograma?.dentes) {
+      const dentesMap = odontograma.dentes.reduce(
+        (acc, d) => ({ ...acc, [d.numeroDente]: d }),
+        {}
+      );
+      setEstadosDentes(dentesMap);
+    }
+  }, [odontograma]);
+
   const getCorDente = (numeroDente: string) => {
     const estado = estadosDentes[numeroDente]?.estado || "saudavel";
     return ESTADOS_DENTE.find((e) => e.value === estado) || ESTADOS_DENTE[0];
@@ -92,10 +128,10 @@ export default function Odontograma3D({ utenteId, dados = [], onSalvar }: Odonto
 
   const handleSalvar = () => {
     const dadosArray = Object.values(estadosDentes);
-    if (onSalvar) {
-      onSalvar(dadosArray);
-    }
-    toast.success("Odontograma salvo com sucesso!");
+    salvarMutation.mutate({
+      utenteId,
+      dentes: dadosArray,
+    });
   };
 
   const renderDente = (numeroDente: string) => {

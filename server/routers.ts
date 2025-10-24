@@ -16,6 +16,8 @@ import { tratamentosRouter } from "./routers/tratamentos";
 import { prescricoesRouter, medicamentosRouter } from "./routers/prescricoes";
 import { odontogramaRouter } from "./routers/odontograma";
 import { periodontogramaRouter } from "./routers/periodontograma";
+import { bloqueiosAgendaRouter } from "./routers/bloqueios-agenda";
+import { listaEsperaRouter } from "./routers/lista-espera";
 
 export const appRouter = router({
   system: systemRouter,
@@ -571,6 +573,16 @@ export const appRouter = router({
   // PERIODONTOGRAMA
   // ========================================
   periodontograma: periodontogramaRouter,
+
+  // ========================================
+  // BLOQUEIOS DE AGENDA
+  // ========================================
+  bloqueiosAgenda: bloqueiosAgendaRouter,
+
+  // ========================================
+  // LISTA DE ESPERA
+  // ========================================
+  listaEspera: listaEsperaRouter,
 });
 
 export type AppRouter = typeof appRouter;

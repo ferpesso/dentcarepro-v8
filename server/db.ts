@@ -3016,3 +3016,841 @@ export async function compararPeriodontogramas(
   };
 }
 
+
+
+// ============================================================================
+// BLOQUEIOS DE AGENDA
+// ============================================================================
+
+interface BloqueioAgenda {
+  id: string;
+  dentistaId: string;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  motivo?: string;
+  tipo: "almoco" | "reuniao" | "folga" | "ferias" | "outro";
+  observacoes?: string;
+  criadoPor: string;
+  criadoEm: string;
+}
+
+// Mock data de bloqueios
+let bloqueiosAgendaMock: BloqueioAgenda[] = [
+  {
+    id: "bloq_1",
+    dentistaId: "1",
+    dataHoraInicio: "2025-10-25T12:00",
+    dataHoraFim: "2025-10-25T13:00",
+    motivo: "Almoço",
+    tipo: "almoco",
+    criadoPor: "1",
+    criadoEm: new Date().toISOString(),
+  },
+  {
+    id: "bloq_2",
+    dentistaId: "1",
+    dataHoraInicio: "2025-10-28T09:00",
+    dataHoraFim: "2025-10-28T12:00",
+    motivo: "Reunião de equipa",
+    tipo: "reuniao",
+    observacoes: "Reunião mensal obrigatória",
+    criadoPor: "1",
+    criadoEm: new Date().toISOString(),
+  },
+];
+
+/**
+ * Listar bloqueios num período
+ */
+export async function listarBloqueios(
+  dataInicio: string,
+  dataFim: string,
+  dentistaId?: string
+): Promise<BloqueioAgenda[]> {
+  if (useMockData) {
+    let filtered = bloqueiosAgendaMock.filter((b) => {
+      const dataInicioBloq = b.dataHoraInicio.split("T")[0];
+      return dataInicioBloq >= dataInicio && dataInicioBloq <= dataFim;
+    });
+
+    if (dentistaId) {
+      filtered = filtered.filter((b) => b.dentistaId === dentistaId);
+    }
+
+    return filtered.sort(
+      (a, b) => new Date(a.dataHoraInicio).getTime() - new Date(b.dataHoraInicio).getTime()
+    );
+  }
+
+  const query = `
+    SELECT 
+      id,
+      dentista_id as "dentistaId",
+      data_hora_inicio as "dataHoraInicio",
+      data_hora_fim as "dataHoraFim",
+      motivo,
+      tipo,
+      observacoes,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM bloqueios_agenda
+    WHERE DATE(data_hora_inicio) BETWEEN $1 AND $2
+    ${dentistaId ? "AND dentista_id = $3" : ""}
+    ORDER BY data_hora_inicio ASC
+  `;
+
+  const params = dentistaId ? [dataInicio, dataFim, dentistaId] : [dataInicio, dataFim];
+  const result = await pool.query(query, params);
+
+  return result.rows;
+}
+
+/**
+ * Criar novo bloqueio
+ */
+export async function criarBloqueio(dados: {
+  dentistaId: string;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  motivo?: string;
+  tipo: string;
+  observacoes?: string;
+  criadoPor: string;
+}): Promise<BloqueioAgenda> {
+  if (useMockData) {
+    const novoBloqueio: BloqueioAgenda = {
+      id: `bloq_${bloqueiosAgendaMock.length + 1}`,
+      dentistaId: dados.dentistaId,
+      dataHoraInicio: dados.dataHoraInicio,
+      dataHoraFim: dados.dataHoraFim,
+      motivo: dados.motivo,
+      tipo: dados.tipo as any,
+      observacoes: dados.observacoes,
+      criadoPor: dados.criadoPor,
+      criadoEm: new Date().toISOString(),
+    };
+
+    bloqueiosAgendaMock.push(novoBloqueio);
+    return novoBloqueio;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO bloqueios_agenda (
+      dentista_id, data_hora_inicio, data_hora_fim, motivo, tipo, observacoes, criado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING 
+      id,
+      dentista_id as "dentistaId",
+      data_hora_inicio as "dataHoraInicio",
+      data_hora_fim as "dataHoraFim",
+      motivo,
+      tipo,
+      observacoes,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"`,
+    [
+      dados.dentistaId,
+      dados.dataHoraInicio,
+      dados.dataHoraFim,
+      dados.motivo,
+      dados.tipo,
+      dados.observacoes,
+      dados.criadoPor,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Atualizar bloqueio existente
+ */
+export async function atualizarBloqueio(dados: {
+  id: string;
+  dataHoraInicio?: string;
+  dataHoraFim?: string;
+  motivo?: string;
+  tipo?: string;
+  observacoes?: string;
+  atualizadoPor: string;
+}): Promise<BloqueioAgenda | null> {
+  if (useMockData) {
+    const index = bloqueiosAgendaMock.findIndex((b) => b.id === dados.id);
+    if (index === -1) return null;
+
+    bloqueiosAgendaMock[index] = {
+      ...bloqueiosAgendaMock[index],
+      ...(dados.dataHoraInicio && { dataHoraInicio: dados.dataHoraInicio }),
+      ...(dados.dataHoraFim && { dataHoraFim: dados.dataHoraFim }),
+      ...(dados.motivo && { motivo: dados.motivo }),
+      ...(dados.tipo && { tipo: dados.tipo as any }),
+      ...(dados.observacoes !== undefined && { observacoes: dados.observacoes }),
+    };
+
+    return bloqueiosAgendaMock[index];
+  }
+
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (dados.dataHoraInicio) {
+    updates.push(`data_hora_inicio = $${paramIndex++}`);
+    values.push(dados.dataHoraInicio);
+  }
+  if (dados.dataHoraFim) {
+    updates.push(`data_hora_fim = $${paramIndex++}`);
+    values.push(dados.dataHoraFim);
+  }
+  if (dados.motivo) {
+    updates.push(`motivo = $${paramIndex++}`);
+    values.push(dados.motivo);
+  }
+  if (dados.tipo) {
+    updates.push(`tipo = $${paramIndex++}`);
+    values.push(dados.tipo);
+  }
+  if (dados.observacoes !== undefined) {
+    updates.push(`observacoes = $${paramIndex++}`);
+    values.push(dados.observacoes);
+  }
+
+  if (updates.length === 0) return null;
+
+  values.push(dados.id);
+
+  const result = await pool.query(
+    `UPDATE bloqueios_agenda
+     SET ${updates.join(", ")}, atualizado_em = NOW()
+     WHERE id = $${paramIndex}
+     RETURNING 
+       id,
+       dentista_id as "dentistaId",
+       data_hora_inicio as "dataHoraInicio",
+       data_hora_fim as "dataHoraFim",
+       motivo,
+       tipo,
+       observacoes,
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    values
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Remover bloqueio
+ */
+export async function removerBloqueio(id: string): Promise<boolean> {
+  if (useMockData) {
+    const index = bloqueiosAgendaMock.findIndex((b) => b.id === id);
+    if (index === -1) return false;
+    bloqueiosAgendaMock.splice(index, 1);
+    return true;
+  }
+
+  const result = await pool.query("DELETE FROM bloqueios_agenda WHERE id = $1", [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Verificar conflitos de horário
+ */
+export async function verificarConflitosAgenda(dados: {
+  dentistaId: string;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  excluirBloqueioId?: string;
+}): Promise<{ temConflito: boolean; conflitos: BloqueioAgenda[] }> {
+  if (useMockData) {
+    const conflitos = bloqueiosAgendaMock.filter((b) => {
+      if (dados.excluirBloqueioId && b.id === dados.excluirBloqueioId) return false;
+      if (b.dentistaId !== dados.dentistaId) return false;
+
+      const inicioB = new Date(b.dataHoraInicio).getTime();
+      const fimB = new Date(b.dataHoraFim).getTime();
+      const inicioNovo = new Date(dados.dataHoraInicio).getTime();
+      const fimNovo = new Date(dados.dataHoraFim).getTime();
+
+      // Verifica sobreposição
+      return (
+        (inicioNovo >= inicioB && inicioNovo < fimB) ||
+        (fimNovo > inicioB && fimNovo <= fimB) ||
+        (inicioNovo <= inicioB && fimNovo >= fimB)
+      );
+    });
+
+    return {
+      temConflito: conflitos.length > 0,
+      conflitos,
+    };
+  }
+
+  const query = `
+    SELECT 
+      id,
+      dentista_id as "dentistaId",
+      data_hora_inicio as "dataHoraInicio",
+      data_hora_fim as "dataHoraFim",
+      motivo,
+      tipo,
+      observacoes,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM bloqueios_agenda
+    WHERE dentista_id = $1
+      AND (
+        (data_hora_inicio >= $2 AND data_hora_inicio < $3)
+        OR (data_hora_fim > $2 AND data_hora_fim <= $3)
+        OR (data_hora_inicio <= $2 AND data_hora_fim >= $3)
+      )
+      ${dados.excluirBloqueioId ? "AND id != $4" : ""}
+  `;
+
+  const params = dados.excluirBloqueioId
+    ? [dados.dentistaId, dados.dataHoraInicio, dados.dataHoraFim, dados.excluirBloqueioId]
+    : [dados.dentistaId, dados.dataHoraInicio, dados.dataHoraFim];
+
+  const result = await pool.query(query, params);
+
+  return {
+    temConflito: result.rows.length > 0,
+    conflitos: result.rows,
+  };
+}
+
+// ============================================================================
+// LISTA DE ESPERA
+// ============================================================================
+
+interface EntradaListaEspera {
+  id: string;
+  utenteId: string;
+  dentistaId?: string;
+  tipoConsulta?: string;
+  dataPreferida?: string;
+  periodoPreferido: "manha" | "tarde" | "qualquer";
+  prioridade: "baixa" | "media" | "alta" | "urgente";
+  observacoes?: string;
+  status: "pendente" | "notificado" | "agendado" | "cancelado";
+  dataNotificacao?: string;
+  dataAgendamento?: string;
+  consultaId?: string;
+  motivoCancelamento?: string;
+  criadoPor: string;
+  criadoEm: string;
+}
+
+// Mock data de lista de espera
+let listaEsperaMock: EntradaListaEspera[] = [
+  {
+    id: "espera_1",
+    utenteId: "2",
+    dentistaId: "1",
+    tipoConsulta: "Limpeza",
+    dataPreferida: "2025-11-01",
+    periodoPreferido: "manha",
+    prioridade: "media",
+    observacoes: "Paciente prefere horário de manhã",
+    status: "pendente",
+    criadoPor: "1",
+    criadoEm: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "espera_2",
+    utenteId: "3",
+    tipoConsulta: "Urgência",
+    periodoPreferido: "qualquer",
+    prioridade: "urgente",
+    observacoes: "Dor aguda, necessita atendimento urgente",
+    status: "pendente",
+    criadoPor: "1",
+    criadoEm: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+/**
+ * Listar lista de espera
+ */
+export async function listarListaEspera(filtros?: {
+  status?: string;
+  prioridade?: string;
+  dentistaId?: string;
+}): Promise<EntradaListaEspera[]> {
+  if (useMockData) {
+    let filtered = [...listaEsperaMock];
+
+    if (filtros?.status) {
+      filtered = filtered.filter((e) => e.status === filtros.status);
+    }
+    if (filtros?.prioridade) {
+      filtered = filtered.filter((e) => e.prioridade === filtros.prioridade);
+    }
+    if (filtros?.dentistaId) {
+      filtered = filtered.filter((e) => e.dentistaId === filtros.dentistaId);
+    }
+
+    // Ordenar por prioridade e data
+    const prioridadeOrdem = { urgente: 0, alta: 1, media: 2, baixa: 3 };
+    return filtered.sort((a, b) => {
+      const prioDiff = prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade];
+      if (prioDiff !== 0) return prioDiff;
+      return new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime();
+    });
+  }
+
+  const conditions: string[] = ["1=1"];
+  const params: any[] = [];
+  let paramIndex = 1;
+
+  if (filtros?.status) {
+    conditions.push(`status = $${paramIndex++}`);
+    params.push(filtros.status);
+  }
+  if (filtros?.prioridade) {
+    conditions.push(`prioridade = $${paramIndex++}`);
+    params.push(filtros.prioridade);
+  }
+  if (filtros?.dentistaId) {
+    conditions.push(`dentista_id = $${paramIndex++}`);
+    params.push(filtros.dentistaId);
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      dentista_id as "dentistaId",
+      tipo_consulta as "tipoConsulta",
+      data_preferida as "dataPreferida",
+      periodo_preferido as "periodoPreferido",
+      prioridade,
+      observacoes,
+      status,
+      data_notificacao as "dataNotificacao",
+      data_agendamento as "dataAgendamento",
+      consulta_id as "consultaId",
+      motivo_cancelamento as "motivoCancelamento",
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM lista_espera
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY 
+      CASE prioridade
+        WHEN 'urgente' THEN 0
+        WHEN 'alta' THEN 1
+        WHEN 'media' THEN 2
+        WHEN 'baixa' THEN 3
+      END,
+      criado_em ASC`,
+    params
+  );
+
+  return result.rows;
+}
+
+/**
+ * Adicionar paciente à lista de espera
+ */
+export async function adicionarListaEspera(dados: {
+  utenteId: string;
+  dentistaId?: string;
+  tipoConsulta?: string;
+  dataPreferida?: string;
+  periodoPreferido: string;
+  prioridade: string;
+  observacoes?: string;
+  criadoPor: string;
+}): Promise<EntradaListaEspera> {
+  if (useMockData) {
+    const novaEntrada: EntradaListaEspera = {
+      id: `espera_${listaEsperaMock.length + 1}`,
+      utenteId: dados.utenteId,
+      dentistaId: dados.dentistaId,
+      tipoConsulta: dados.tipoConsulta,
+      dataPreferida: dados.dataPreferida,
+      periodoPreferido: dados.periodoPreferido as any,
+      prioridade: dados.prioridade as any,
+      observacoes: dados.observacoes,
+      status: "pendente",
+      criadoPor: dados.criadoPor,
+      criadoEm: new Date().toISOString(),
+    };
+
+    listaEsperaMock.push(novaEntrada);
+    return novaEntrada;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO lista_espera (
+      utente_id, dentista_id, tipo_consulta, data_preferida, periodo_preferido,
+      prioridade, observacoes, status, criado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendente', $8)
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      dentista_id as "dentistaId",
+      tipo_consulta as "tipoConsulta",
+      data_preferida as "dataPreferida",
+      periodo_preferido as "periodoPreferido",
+      prioridade,
+      observacoes,
+      status,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"`,
+    [
+      dados.utenteId,
+      dados.dentistaId,
+      dados.tipoConsulta,
+      dados.dataPreferida,
+      dados.periodoPreferido,
+      dados.prioridade,
+      dados.observacoes,
+      dados.criadoPor,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Marcar como notificado
+ */
+export async function marcarNotificado(dados: {
+  id: string;
+  dataNotificacao?: string;
+  observacoes?: string;
+  notificadoPor: string;
+}): Promise<EntradaListaEspera | null> {
+  if (useMockData) {
+    const index = listaEsperaMock.findIndex((e) => e.id === dados.id);
+    if (index === -1) return null;
+
+    listaEsperaMock[index] = {
+      ...listaEsperaMock[index],
+      status: "notificado",
+      dataNotificacao: dados.dataNotificacao || new Date().toISOString(),
+      ...(dados.observacoes && { observacoes: dados.observacoes }),
+    };
+
+    return listaEsperaMock[index];
+  }
+
+  const result = await pool.query(
+    `UPDATE lista_espera
+     SET status = 'notificado',
+         data_notificacao = $2,
+         observacoes = COALESCE($3, observacoes),
+         atualizado_em = NOW()
+     WHERE id = $1
+     RETURNING 
+       id,
+       utente_id as "utenteId",
+       dentista_id as "dentistaId",
+       tipo_consulta as "tipoConsulta",
+       data_preferida as "dataPreferida",
+       periodo_preferido as "periodoPreferido",
+       prioridade,
+       observacoes,
+       status,
+       data_notificacao as "dataNotificacao",
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    [dados.id, dados.dataNotificacao || new Date().toISOString(), dados.observacoes]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Marcar como agendado
+ */
+export async function marcarAgendado(dados: {
+  id: string;
+  consultaId: string;
+  dataAgendamento?: string;
+  agendadoPor: string;
+}): Promise<EntradaListaEspera | null> {
+  if (useMockData) {
+    const index = listaEsperaMock.findIndex((e) => e.id === dados.id);
+    if (index === -1) return null;
+
+    listaEsperaMock[index] = {
+      ...listaEsperaMock[index],
+      status: "agendado",
+      consultaId: dados.consultaId,
+      dataAgendamento: dados.dataAgendamento || new Date().toISOString(),
+    };
+
+    return listaEsperaMock[index];
+  }
+
+  const result = await pool.query(
+    `UPDATE lista_espera
+     SET status = 'agendado',
+         consulta_id = $2,
+         data_agendamento = $3,
+         atualizado_em = NOW()
+     WHERE id = $1
+     RETURNING 
+       id,
+       utente_id as "utenteId",
+       dentista_id as "dentistaId",
+       tipo_consulta as "tipoConsulta",
+       data_preferida as "dataPreferida",
+       periodo_preferido as "periodoPreferido",
+       prioridade,
+       observacoes,
+       status,
+       data_agendamento as "dataAgendamento",
+       consulta_id as "consultaId",
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    [dados.id, dados.consultaId, dados.dataAgendamento || new Date().toISOString()]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Cancelar entrada na lista
+ */
+export async function cancelarListaEspera(dados: {
+  id: string;
+  motivoCancelamento?: string;
+  canceladoPor: string;
+}): Promise<EntradaListaEspera | null> {
+  if (useMockData) {
+    const index = listaEsperaMock.findIndex((e) => e.id === dados.id);
+    if (index === -1) return null;
+
+    listaEsperaMock[index] = {
+      ...listaEsperaMock[index],
+      status: "cancelado",
+      motivoCancelamento: dados.motivoCancelamento,
+    };
+
+    return listaEsperaMock[index];
+  }
+
+  const result = await pool.query(
+    `UPDATE lista_espera
+     SET status = 'cancelado',
+         motivo_cancelamento = $2,
+         atualizado_em = NOW()
+     WHERE id = $1
+     RETURNING 
+       id,
+       utente_id as "utenteId",
+       dentista_id as "dentistaId",
+       tipo_consulta as "tipoConsulta",
+       data_preferida as "dataPreferida",
+       periodo_preferido as "periodoPreferido",
+       prioridade,
+       observacoes,
+       status,
+       motivo_cancelamento as "motivoCancelamento",
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    [dados.id, dados.motivoCancelamento]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Atualizar prioridade
+ */
+export async function atualizarPrioridadeListaEspera(dados: {
+  id: string;
+  prioridade: string;
+  atualizadoPor: string;
+}): Promise<EntradaListaEspera | null> {
+  if (useMockData) {
+    const index = listaEsperaMock.findIndex((e) => e.id === dados.id);
+    if (index === -1) return null;
+
+    listaEsperaMock[index] = {
+      ...listaEsperaMock[index],
+      prioridade: dados.prioridade as any,
+    };
+
+    return listaEsperaMock[index];
+  }
+
+  const result = await pool.query(
+    `UPDATE lista_espera
+     SET prioridade = $2,
+         atualizado_em = NOW()
+     WHERE id = $1
+     RETURNING 
+       id,
+       utente_id as "utenteId",
+       dentista_id as "dentistaId",
+       tipo_consulta as "tipoConsulta",
+       data_preferida as "dataPreferida",
+       periodo_preferido as "periodoPreferido",
+       prioridade,
+       observacoes,
+       status,
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    [dados.id, dados.prioridade]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Obter estatísticas da lista de espera
+ */
+export async function obterEstatisticasListaEspera(): Promise<{
+  total: number;
+  pendentes: number;
+  notificados: number;
+  agendados: number;
+  cancelados: number;
+  porPrioridade: {
+    urgente: number;
+    alta: number;
+    media: number;
+    baixa: number;
+  };
+  tempoMedioEspera: number;
+}> {
+  if (useMockData) {
+    const total = listaEsperaMock.length;
+    const pendentes = listaEsperaMock.filter((e) => e.status === "pendente").length;
+    const notificados = listaEsperaMock.filter((e) => e.status === "notificado").length;
+    const agendados = listaEsperaMock.filter((e) => e.status === "agendado").length;
+    const cancelados = listaEsperaMock.filter((e) => e.status === "cancelado").length;
+
+    return {
+      total,
+      pendentes,
+      notificados,
+      agendados,
+      cancelados,
+      porPrioridade: {
+        urgente: listaEsperaMock.filter((e) => e.prioridade === "urgente").length,
+        alta: listaEsperaMock.filter((e) => e.prioridade === "alta").length,
+        media: listaEsperaMock.filter((e) => e.prioridade === "media").length,
+        baixa: listaEsperaMock.filter((e) => e.prioridade === "baixa").length,
+      },
+      tempoMedioEspera: 3, // dias (mock)
+    };
+  }
+
+  const result = await pool.query(`
+    SELECT 
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE status = 'pendente') as pendentes,
+      COUNT(*) FILTER (WHERE status = 'notificado') as notificados,
+      COUNT(*) FILTER (WHERE status = 'agendado') as agendados,
+      COUNT(*) FILTER (WHERE status = 'cancelado') as cancelados,
+      COUNT(*) FILTER (WHERE prioridade = 'urgente') as urgente,
+      COUNT(*) FILTER (WHERE prioridade = 'alta') as alta,
+      COUNT(*) FILTER (WHERE prioridade = 'media') as media,
+      COUNT(*) FILTER (WHERE prioridade = 'baixa') as baixa,
+      AVG(EXTRACT(EPOCH FROM (data_agendamento - criado_em))/86400) as tempo_medio_espera
+    FROM lista_espera
+  `);
+
+  const row = result.rows[0];
+
+  return {
+    total: parseInt(row.total),
+    pendentes: parseInt(row.pendentes),
+    notificados: parseInt(row.notificados),
+    agendados: parseInt(row.agendados),
+    cancelados: parseInt(row.cancelados),
+    porPrioridade: {
+      urgente: parseInt(row.urgente),
+      alta: parseInt(row.alta),
+      media: parseInt(row.media),
+      baixa: parseInt(row.baixa),
+    },
+    tempoMedioEspera: parseFloat(row.tempo_medio_espera) || 0,
+  };
+}
+
+/**
+ * Sugerir próximos pacientes para agendar
+ */
+export async function sugerirProximosListaEspera(filtros: {
+  dentistaId?: string;
+  data?: string;
+  periodo?: string;
+  limite: number;
+}): Promise<EntradaListaEspera[]> {
+  if (useMockData) {
+    let filtered = listaEsperaMock.filter((e) => e.status === "pendente");
+
+    if (filtros.dentistaId) {
+      filtered = filtered.filter((e) => !e.dentistaId || e.dentistaId === filtros.dentistaId);
+    }
+    if (filtros.periodo && filtros.periodo !== "qualquer") {
+      filtered = filtered.filter(
+        (e) => e.periodoPreferido === filtros.periodo || e.periodoPreferido === "qualquer"
+      );
+    }
+
+    // Ordenar por prioridade
+    const prioridadeOrdem = { urgente: 0, alta: 1, media: 2, baixa: 3 };
+    filtered.sort((a, b) => {
+      const prioDiff = prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade];
+      if (prioDiff !== 0) return prioDiff;
+      return new Date(a.criadoEm).getTime() - new Date(b.criadoEm).getTime();
+    });
+
+    return filtered.slice(0, filtros.limite);
+  }
+
+  const conditions: string[] = ["status = 'pendente'"];
+  const params: any[] = [];
+  let paramIndex = 1;
+
+  if (filtros.dentistaId) {
+    conditions.push(`(dentista_id IS NULL OR dentista_id = $${paramIndex++})`);
+    params.push(filtros.dentistaId);
+  }
+  if (filtros.periodo && filtros.periodo !== "qualquer") {
+    conditions.push(
+      `(periodo_preferido = $${paramIndex++} OR periodo_preferido = 'qualquer')`
+    );
+    params.push(filtros.periodo);
+  }
+
+  params.push(filtros.limite);
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      dentista_id as "dentistaId",
+      tipo_consulta as "tipoConsulta",
+      data_preferida as "dataPreferida",
+      periodo_preferido as "periodoPreferido",
+      prioridade,
+      observacoes,
+      status,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM lista_espera
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY 
+      CASE prioridade
+        WHEN 'urgente' THEN 0
+        WHEN 'alta' THEN 1
+        WHEN 'media' THEN 2
+        WHEN 'baixa' THEN 3
+      END,
+      criado_em ASC
+    LIMIT $${paramIndex}`,
+    params
+  );
+
+  return result.rows;
+}
+
