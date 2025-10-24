@@ -14,6 +14,8 @@ import { contasPagarRouter } from "./routers/contas-pagar";
 import { iaFinanceiraRouter } from "./routers/ia-financeira";
 import { tratamentosRouter } from "./routers/tratamentos";
 import { prescricoesRouter, medicamentosRouter } from "./routers/prescricoes";
+import { odontogramaRouter } from "./routers/odontograma";
+import { periodontogramaRouter } from "./routers/periodontograma";
 
 export const appRouter = router({
   system: systemRouter,
@@ -559,6 +561,16 @@ export const appRouter = router({
   // MEDICAMENTOS
   // ========================================
   medicamentos: medicamentosRouter,
+
+  // ========================================
+  // ODONTOGRAMA
+  // ========================================
+  odontograma: odontogramaRouter,
+
+  // ========================================
+  // PERIODONTOGRAMA
+  // ========================================
+  periodontograma: periodontogramaRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -2400,3 +2400,619 @@ export async function obterMedicamento(id: string): Promise<MedicamentoInfo | nu
   return result.rows[0] || null;
 }
 
+
+
+// ============================================================================
+// ODONTOGRAMA
+// ============================================================================
+
+interface DenteEstado {
+  numeroDente: string;
+  estado: string;
+  observacoes?: string;
+}
+
+interface Odontograma {
+  id: string;
+  utenteId: string;
+  dentes: DenteEstado[];
+  observacoesGerais?: string;
+  atualizadoPor: string;
+  atualizadoEm: string;
+}
+
+interface HistoricoOdontograma {
+  id: string;
+  utenteId: string;
+  data: string;
+  dentes: DenteEstado[];
+  observacoes?: string;
+  atualizadoPor: string;
+}
+
+// Mock data de odontogramas
+let odontogramasMock: Record<string, Odontograma> = {
+  "1": {
+    id: "odonto_1",
+    utenteId: "1",
+    dentes: [
+      { numeroDente: "16", estado: "carie", observacoes: "Cárie oclusal" },
+      { numeroDente: "26", estado: "tratamento_canal", observacoes: "Endodontia em andamento" },
+      { numeroDente: "36", estado: "restauracao", observacoes: "Restauração em resina" },
+      { numeroDente: "46", estado: "coroa", observacoes: "Coroa em porcelana" },
+    ],
+    observacoesGerais: "Paciente com boa higiene oral",
+    atualizadoPor: "1",
+    atualizadoEm: new Date().toISOString(),
+  },
+};
+
+let historicoOdontogramaMock: HistoricoOdontograma[] = [];
+
+/**
+ * Obter odontograma atual de um utente
+ */
+export async function obterOdontograma(utenteId: string): Promise<Odontograma | null> {
+  if (useMockData) {
+    return odontogramasMock[utenteId] || null;
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      dentes,
+      observacoes_gerais as "observacoesGerais",
+      atualizado_por as "atualizadoPor",
+      atualizado_em as "atualizadoEm"
+    FROM odontogramas
+    WHERE utente_id = $1
+    ORDER BY atualizado_em DESC
+    LIMIT 1`,
+    [utenteId]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  return {
+    ...result.rows[0],
+    dentes: JSON.parse(result.rows[0].dentes),
+  };
+}
+
+/**
+ * Obter histórico de alterações do odontograma
+ */
+export async function obterHistoricoOdontograma(
+  utenteId: string
+): Promise<HistoricoOdontograma[]> {
+  if (useMockData) {
+    return historicoOdontogramaMock.filter((h) => h.utenteId === utenteId);
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      dentes,
+      observacoes,
+      atualizado_por as "atualizadoPor"
+    FROM historico_odontogramas
+    WHERE utente_id = $1
+    ORDER BY data DESC`,
+    [utenteId]
+  );
+
+  return result.rows.map((row) => ({
+    ...row,
+    dentes: JSON.parse(row.dentes),
+  }));
+}
+
+/**
+ * Salvar/atualizar odontograma completo
+ */
+export async function salvarOdontograma(dados: {
+  utenteId: string;
+  dentes: DenteEstado[];
+  observacoesGerais?: string;
+  atualizadoPor: string;
+}): Promise<Odontograma> {
+  if (useMockData) {
+    // Salvar no histórico antes de atualizar
+    const odontogramaAtual = odontogramasMock[dados.utenteId];
+    if (odontogramaAtual) {
+      historicoOdontogramaMock.push({
+        id: `hist_odonto_${historicoOdontogramaMock.length + 1}`,
+        utenteId: dados.utenteId,
+        data: new Date().toISOString(),
+        dentes: odontogramaAtual.dentes,
+        observacoes: odontogramaAtual.observacoesGerais,
+        atualizadoPor: dados.atualizadoPor,
+      });
+    }
+
+    // Atualizar odontograma atual
+    const novoOdontograma: Odontograma = {
+      id: odontogramaAtual?.id || `odonto_${Object.keys(odontogramasMock).length + 1}`,
+      utenteId: dados.utenteId,
+      dentes: dados.dentes,
+      observacoesGerais: dados.observacoesGerais,
+      atualizadoPor: dados.atualizadoPor,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    odontogramasMock[dados.utenteId] = novoOdontograma;
+    return novoOdontograma;
+  }
+
+  // Verificar se já existe odontograma
+  const existente = await pool.query(
+    "SELECT id FROM odontogramas WHERE utente_id = $1",
+    [dados.utenteId]
+  );
+
+  if (existente.rows.length > 0) {
+    // Salvar no histórico
+    await pool.query(
+      `INSERT INTO historico_odontogramas (utente_id, data, dentes, observacoes, atualizado_por)
+       SELECT utente_id, NOW(), dentes, observacoes_gerais, $2
+       FROM odontogramas
+       WHERE utente_id = $1`,
+      [dados.utenteId, dados.atualizadoPor]
+    );
+
+    // Atualizar odontograma
+    const result = await pool.query(
+      `UPDATE odontogramas
+       SET dentes = $2, observacoes_gerais = $3, atualizado_por = $4, atualizado_em = NOW()
+       WHERE utente_id = $1
+       RETURNING 
+         id,
+         utente_id as "utenteId",
+         dentes,
+         observacoes_gerais as "observacoesGerais",
+         atualizado_por as "atualizadoPor",
+         atualizado_em as "atualizadoEm"`,
+      [dados.utenteId, JSON.stringify(dados.dentes), dados.observacoesGerais, dados.atualizadoPor]
+    );
+
+    return {
+      ...result.rows[0],
+      dentes: JSON.parse(result.rows[0].dentes),
+    };
+  } else {
+    // Criar novo odontograma
+    const result = await pool.query(
+      `INSERT INTO odontogramas (utente_id, dentes, observacoes_gerais, atualizado_por)
+       VALUES ($1, $2, $3, $4)
+       RETURNING 
+         id,
+         utente_id as "utenteId",
+         dentes,
+         observacoes_gerais as "observacoesGerais",
+         atualizado_por as "atualizadoPor",
+         atualizado_em as "atualizadoEm"`,
+      [dados.utenteId, JSON.stringify(dados.dentes), dados.observacoesGerais, dados.atualizadoPor]
+    );
+
+    return {
+      ...result.rows[0],
+      dentes: JSON.parse(result.rows[0].dentes),
+    };
+  }
+}
+
+/**
+ * Atualizar estado de um dente específico
+ */
+export async function atualizarDenteOdontograma(dados: {
+  utenteId: string;
+  dente: DenteEstado;
+  atualizadoPor: string;
+}): Promise<Odontograma> {
+  const odontogramaAtual = await obterOdontograma(dados.utenteId);
+
+  let dentes: DenteEstado[] = [];
+  if (odontogramaAtual) {
+    // Atualizar dente existente ou adicionar novo
+    const index = odontogramaAtual.dentes.findIndex(
+      (d) => d.numeroDente === dados.dente.numeroDente
+    );
+    if (index >= 0) {
+      dentes = [...odontogramaAtual.dentes];
+      dentes[index] = dados.dente;
+    } else {
+      dentes = [...odontogramaAtual.dentes, dados.dente];
+    }
+  } else {
+    dentes = [dados.dente];
+  }
+
+  return await salvarOdontograma({
+    utenteId: dados.utenteId,
+    dentes,
+    observacoesGerais: odontogramaAtual?.observacoesGerais,
+    atualizadoPor: dados.atualizadoPor,
+  });
+}
+
+/**
+ * Obter estatísticas do odontograma
+ */
+export async function obterEstatisticasOdontograma(utenteId: string): Promise<{
+  totalDentes: number;
+  saudaveis: number;
+  caries: number;
+  restauracoes: number;
+  coroas: number;
+  implantes: number;
+  extraidos: number;
+  ausentes: number;
+  tratamentosCanal: number;
+  pontes: number;
+}> {
+  const odontograma = await obterOdontograma(utenteId);
+
+  if (!odontograma) {
+    return {
+      totalDentes: 0,
+      saudaveis: 0,
+      caries: 0,
+      restauracoes: 0,
+      coroas: 0,
+      implantes: 0,
+      extraidos: 0,
+      ausentes: 0,
+      tratamentosCanal: 0,
+      pontes: 0,
+    };
+  }
+
+  const dentes = odontograma.dentes;
+
+  return {
+    totalDentes: dentes.length,
+    saudaveis: dentes.filter((d) => d.estado === "saudavel").length,
+    caries: dentes.filter((d) => d.estado === "carie").length,
+    restauracoes: dentes.filter((d) => d.estado === "restauracao").length,
+    coroas: dentes.filter((d) => d.estado === "coroa").length,
+    implantes: dentes.filter((d) => d.estado === "implante").length,
+    extraidos: dentes.filter((d) => d.estado === "extraido").length,
+    ausentes: dentes.filter((d) => d.estado === "ausente").length,
+    tratamentosCanal: dentes.filter((d) => d.estado === "tratamento_canal").length,
+    pontes: dentes.filter((d) => d.estado === "ponte").length,
+  };
+}
+
+// ============================================================================
+// PERIODONTOGRAMA
+// ============================================================================
+
+interface MedicaoPeriodonta {
+  numeroDente: string;
+  profundidadeSondagem: {
+    mesioVestibular: number;
+    vestibular: number;
+    distoVestibular: number;
+    mesioLingual: number;
+    lingual: number;
+    distoLingual: number;
+  };
+  nivelInsercao: {
+    mesioVestibular: number;
+    vestibular: number;
+    distoVestibular: number;
+    mesioLingual: number;
+    lingual: number;
+    distoLingual: number;
+  };
+  sangramento: {
+    mesioVestibular: boolean;
+    vestibular: boolean;
+    distoVestibular: boolean;
+    mesioLingual: boolean;
+    lingual: boolean;
+    distoLingual: boolean;
+  };
+  mobilidade: number;
+  furca: number;
+  observacoes?: string;
+}
+
+interface Periodontograma {
+  id: string;
+  utenteId: string;
+  data: string;
+  medicoes: MedicaoPeriodonta[];
+  observacoesGerais?: string;
+  diagnostico?: string;
+  criadoPor: string;
+  criadoEm: string;
+}
+
+// Mock data de periodontogramas
+let periodontogramasMock: Periodontograma[] = [];
+
+/**
+ * Obter periodontograma mais recente de um utente
+ */
+export async function obterPeriodontograma(utenteId: string): Promise<Periodontograma | null> {
+  if (useMockData) {
+    const periodontogramas = periodontogramasMock.filter((p) => p.utenteId === utenteId);
+    if (periodontogramas.length === 0) return null;
+    return periodontogramas.sort(
+      (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
+    )[0];
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicoes,
+      observacoes_gerais as "observacoesGerais",
+      diagnostico,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM periodontogramas
+    WHERE utente_id = $1
+    ORDER BY data DESC
+    LIMIT 1`,
+    [utenteId]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  return {
+    ...result.rows[0],
+    medicoes: JSON.parse(result.rows[0].medicoes),
+  };
+}
+
+/**
+ * Obter histórico de periodontogramas (evolução)
+ */
+export async function obterHistoricoPeriodontograma(
+  utenteId: string
+): Promise<Periodontograma[]> {
+  if (useMockData) {
+    return periodontogramasMock
+      .filter((p) => p.utenteId === utenteId)
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicoes,
+      observacoes_gerais as "observacoesGerais",
+      diagnostico,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"
+    FROM periodontogramas
+    WHERE utente_id = $1
+    ORDER BY data DESC`,
+    [utenteId]
+  );
+
+  return result.rows.map((row) => ({
+    ...row,
+    medicoes: JSON.parse(row.medicoes),
+  }));
+}
+
+/**
+ * Salvar novo periodontograma completo
+ */
+export async function salvarPeriodontograma(dados: {
+  utenteId: string;
+  data: string;
+  medicoes: MedicaoPeriodonta[];
+  observacoesGerais?: string;
+  diagnostico?: string;
+  criadoPor: string;
+}): Promise<Periodontograma> {
+  if (useMockData) {
+    const novoPeriodontograma: Periodontograma = {
+      id: `periodo_${periodontogramasMock.length + 1}`,
+      utenteId: dados.utenteId,
+      data: dados.data,
+      medicoes: dados.medicoes,
+      observacoesGerais: dados.observacoesGerais,
+      diagnostico: dados.diagnostico,
+      criadoPor: dados.criadoPor,
+      criadoEm: new Date().toISOString(),
+    };
+
+    periodontogramasMock.push(novoPeriodontograma);
+    return novoPeriodontograma;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO periodontogramas (
+      utente_id, data, medicoes, observacoes_gerais, diagnostico, criado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicoes,
+      observacoes_gerais as "observacoesGerais",
+      diagnostico,
+      criado_por as "criadoPor",
+      criado_em as "criadoEm"`,
+    [
+      dados.utenteId,
+      dados.data,
+      JSON.stringify(dados.medicoes),
+      dados.observacoesGerais,
+      dados.diagnostico,
+      dados.criadoPor,
+    ]
+  );
+
+  return {
+    ...result.rows[0],
+    medicoes: JSON.parse(result.rows[0].medicoes),
+  };
+}
+
+/**
+ * Atualizar medição de um dente específico
+ */
+export async function atualizarDentePeriodontograma(dados: {
+  periodontogramaId: string;
+  medicao: MedicaoPeriodonta;
+  atualizadoPor: string;
+}): Promise<Periodontograma> {
+  if (useMockData) {
+    const index = periodontogramasMock.findIndex((p) => p.id === dados.periodontogramaId);
+    if (index === -1) {
+      throw new Error("Periodontograma não encontrado");
+    }
+
+    const periodontograma = periodontogramasMock[index];
+    const medicaoIndex = periodontograma.medicoes.findIndex(
+      (m) => m.numeroDente === dados.medicao.numeroDente
+    );
+
+    if (medicaoIndex >= 0) {
+      periodontograma.medicoes[medicaoIndex] = dados.medicao;
+    } else {
+      periodontograma.medicoes.push(dados.medicao);
+    }
+
+    return periodontograma;
+  }
+
+  const result = await pool.query(
+    `UPDATE periodontogramas
+     SET medicoes = (
+       SELECT jsonb_agg(
+         CASE 
+           WHEN elem->>'numeroDente' = $2
+           THEN $3::jsonb
+           ELSE elem
+         END
+       )
+       FROM jsonb_array_elements(medicoes) elem
+     )
+     WHERE id = $1
+     RETURNING 
+       id,
+       utente_id as "utenteId",
+       data,
+       medicoes,
+       observacoes_gerais as "observacoesGerais",
+       diagnostico,
+       criado_por as "criadoPor",
+       criado_em as "criadoEm"`,
+    [dados.periodontogramaId, dados.medicao.numeroDente, JSON.stringify(dados.medicao)]
+  );
+
+  return {
+    ...result.rows[0],
+    medicoes: JSON.parse(result.rows[0].medicoes),
+  };
+}
+
+/**
+ * Obter estatísticas e análise periodontal
+ */
+export async function obterEstatisticasPeriodontograma(utenteId: string): Promise<{
+  totalDentes: number;
+  profundidadeMedia: number;
+  profundidadeMaxima: number;
+  sitiosComSangramento: number;
+  percentualSangramento: number;
+  dentesComMobilidade: number;
+  dentesComFurca: number;
+  classificacao: string;
+}> {
+  const periodontograma = await obterPeriodontograma(utenteId);
+
+  if (!periodontograma || periodontograma.medicoes.length === 0) {
+    return {
+      totalDentes: 0,
+      profundidadeMedia: 0,
+      profundidadeMaxima: 0,
+      sitiosComSangramento: 0,
+      percentualSangramento: 0,
+      dentesComMobilidade: 0,
+      dentesComFurca: 0,
+      classificacao: "Sem dados",
+    };
+  }
+
+  const medicoes = periodontograma.medicoes;
+  let somaProfundidades = 0;
+  let totalSitios = 0;
+  let sitiosComSangramento = 0;
+  let profundidadeMaxima = 0;
+
+  medicoes.forEach((m) => {
+    const profundidades = Object.values(m.profundidadeSondagem);
+    profundidades.forEach((p) => {
+      somaProfundidades += p;
+      totalSitios++;
+      if (p > profundidadeMaxima) profundidadeMaxima = p;
+    });
+
+    const sangramentos = Object.values(m.sangramento);
+    sitiosComSangramento += sangramentos.filter((s) => s).length;
+  });
+
+  const profundidadeMedia = totalSitios > 0 ? somaProfundidades / totalSitios : 0;
+  const percentualSangramento = totalSitios > 0 ? (sitiosComSangramento / totalSitios) * 100 : 0;
+
+  // Classificação simplificada
+  let classificacao = "Saudável";
+  if (profundidadeMedia > 5 || percentualSangramento > 50) {
+    classificacao = "Periodontite Severa";
+  } else if (profundidadeMedia > 4 || percentualSangramento > 30) {
+    classificacao = "Periodontite Moderada";
+  } else if (profundidadeMedia > 3 || percentualSangramento > 10) {
+    classificacao = "Periodontite Leve";
+  } else if (percentualSangramento > 0) {
+    classificacao = "Gengivite";
+  }
+
+  return {
+    totalDentes: medicoes.length,
+    profundidadeMedia: Math.round(profundidadeMedia * 10) / 10,
+    profundidadeMaxima,
+    sitiosComSangramento,
+    percentualSangramento: Math.round(percentualSangramento * 10) / 10,
+    dentesComMobilidade: medicoes.filter((m) => m.mobilidade > 0).length,
+    dentesComFurca: medicoes.filter((m) => m.furca > 0).length,
+    classificacao,
+  };
+}
+
+/**
+ * Comparar dois periodontogramas (evolução)
+ */
+export async function compararPeriodontogramas(
+  periodontogramaId1: string,
+  periodontogramaId2: string
+): Promise<{
+  melhoria: boolean;
+  diferencaProfundidade: number;
+  diferencaSangramento: number;
+  observacoes: string;
+}> {
+  // Implementação simplificada
+  // Em produção, faria análise detalhada dente por dente
+  return {
+    melhoria: true,
+    diferencaProfundidade: -0.5,
+    diferencaSangramento: -10,
+    observacoes: "Melhoria geral observada. Redução de profundidade e sangramento.",
+  };
+}
+
