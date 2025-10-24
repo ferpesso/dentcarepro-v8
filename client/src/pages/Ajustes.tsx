@@ -6,6 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfiguracoesBasicas from "@/components/ajustes/ConfiguracoesBasicas";
 import GestaoDentistas from "@/components/ajustes/GestaoDentistas";
 import ConfiguracoesFinanceiras from "@/components/ajustes/ConfiguracoesFinanceiras";
+import ConfiguracoesBranding from "@/components/ajustes/ConfiguracoesBranding";
+import ConfiguracoesDocumentos from "@/components/ajustes/ConfiguracoesDocumentos";
+import ConfiguracoesAvancadas from "@/components/ajustes/ConfiguracoesAvancadas";
 
 export default function Ajustes() {
   const [activeTab, setActiveTab] = useState("basicas");
@@ -70,47 +73,17 @@ export default function Ajustes() {
 
           {/* Branding */}
           <TabsContent value="branding">
-            <Card>
-              <CardHeader>
-                <CardTitle>Branding e Personalização</CardTitle>
-                <CardDescription>
-                  Personalize a identidade visual da sua clínica
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500">Em desenvolvimento...</p>
-              </CardContent>
-            </Card>
+            <ConfiguracoesBranding />
           </TabsContent>
 
           {/* Documentos */}
           <TabsContent value="documentos">
-            <Card>
-              <CardHeader>
-                <CardTitle>Templates de Documentos</CardTitle>
-                <CardDescription>
-                  Configure templates para faturas, recibos e outros documentos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500">Em desenvolvimento...</p>
-              </CardContent>
-            </Card>
+            <ConfiguracoesDocumentos />
           </TabsContent>
 
           {/* Avançado */}
           <TabsContent value="avancado">
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações Avançadas</CardTitle>
-                <CardDescription>
-                  Base de dados, backup, integrações e notificações
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500">Em desenvolvimento...</p>
-              </CardContent>
-            </Card>
+            <ConfiguracoesAvancadas />
           </TabsContent>
         </Tabs>
       </div>
