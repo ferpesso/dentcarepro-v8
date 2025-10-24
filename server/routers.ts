@@ -12,6 +12,8 @@ import { comissoesRouter } from "./routers/comissoes";
 import { laboratoriosRouter } from "./routers/laboratorios";
 import { contasPagarRouter } from "./routers/contas-pagar";
 import { iaFinanceiraRouter } from "./routers/ia-financeira";
+import { tratamentosRouter } from "./routers/tratamentos";
+import { prescricoesRouter, medicamentosRouter } from "./routers/prescricoes";
 
 export const appRouter = router({
   system: systemRouter,
@@ -542,6 +544,21 @@ export const appRouter = router({
   // IA FINANCEIRA
   // ========================================
   iaFinanceira: iaFinanceiraRouter,
+
+  // ========================================
+  // TRATAMENTOS
+  // ========================================
+  tratamentos: tratamentosRouter,
+
+  // ========================================
+  // PRESCRIÇÕES
+  // ========================================
+  prescricoes: prescricoesRouter,
+
+  // ========================================
+  // MEDICAMENTOS
+  // ========================================
+  medicamentos: medicamentosRouter,
 });
 
 export type AppRouter = typeof appRouter;

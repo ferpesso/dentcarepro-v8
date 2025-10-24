@@ -22,6 +22,9 @@ pool.on('error', (err) => {
   console.error('[PostgreSQL] Unexpected error:', err);
 });
 
+// Flag para usar mock data quando não há conexão com BD
+const useMockData = !process.env.DATABASE_URL || process.env.USE_MOCK_DATA === 'true';
+
 export async function getDb() {
   return pool;
 }
@@ -1238,5 +1241,1162 @@ export async function obterDashboardFinanceiro() {
     contasPendentes: parseInt(contasPendentesResult.rows[0].total),
     faturasEmitidas: parseInt(faturasResult.rows[0].total),
   };
+}
+
+
+// ============================================================================
+// TRATAMENTOS
+// ============================================================================
+
+interface Tratamento {
+  id: string;
+  utenteId: string;
+  consultaId?: string | null;
+  dentistaId?: string;
+  data: string;
+  dente?: string | null;
+  procedimento: string;
+  descricao?: string | null;
+  valor: number;
+  valorPago: number;
+  status: "planeado" | "em_andamento" | "concluido" | "cancelado";
+  observacoes?: string | null;
+  criadoPor: string;
+  atualizadoPor?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+// Mock data de tratamentos
+let tratamentosMock: Tratamento[] = [
+  {
+    id: "trat_1",
+    utenteId: "1",
+    dentistaId: "1",
+    data: "2025-10-15",
+    dente: "16",
+    procedimento: "Restauração em Resina Composta",
+    descricao: "Restauração classe II na face oclusal",
+    valor: 80.00,
+    valorPago: 80.00,
+    status: "concluido",
+    observacoes: "Paciente tolerou bem o procedimento",
+    criadoPor: "1",
+    criadoEm: new Date("2025-10-15").toISOString(),
+    atualizadoEm: new Date("2025-10-15").toISOString(),
+  },
+  {
+    id: "trat_2",
+    utenteId: "1",
+    dentistaId: "1",
+    data: "2025-10-20",
+    dente: "26",
+    procedimento: "Endodontia",
+    descricao: "Tratamento endodôntico - 1ª sessão",
+    valor: 250.00,
+    valorPago: 0,
+    status: "em_andamento",
+    observacoes: "Necessário mais 2 sessões",
+    criadoPor: "1",
+    criadoEm: new Date("2025-10-20").toISOString(),
+    atualizadoEm: new Date("2025-10-20").toISOString(),
+  },
+  {
+    id: "trat_3",
+    utenteId: "2",
+    dentistaId: "1",
+    data: "2025-11-05",
+    dente: "11",
+    procedimento: "Coroa em Porcelana",
+    descricao: "Coroa total em porcelana sobre metal",
+    valor: 450.00,
+    valorPago: 0,
+    status: "planeado",
+    observacoes: "Aguardando laboratório",
+    criadoPor: "1",
+    criadoEm: new Date("2025-10-22").toISOString(),
+    atualizadoEm: new Date("2025-10-22").toISOString(),
+  },
+];
+
+/**
+ * Listar todos os tratamentos
+ */
+export async function listarTratamentos(): Promise<Tratamento[]> {
+  if (useMockData) {
+    return tratamentosMock.sort((a, b) => 
+      new Date(b.data).getTime() - new Date(a.data).getTime()
+    );
+  }
+
+  const result = await pool.query(`
+    SELECT 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM tratamentos
+    ORDER BY data DESC
+  `);
+
+  return result.rows;
+}
+
+/**
+ * Listar tratamentos de um utente
+ */
+export async function listarTratamentosUtente(utenteId: string): Promise<Tratamento[]> {
+  if (useMockData) {
+    return tratamentosMock
+      .filter(t => t.utenteId === utenteId)
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM tratamentos
+    WHERE utente_id = $1
+    ORDER BY data DESC`,
+    [utenteId]
+  );
+
+  return result.rows;
+}
+
+/**
+ * Listar tratamentos com paginação
+ */
+export async function listarTratamentosPaginado(params: {
+  page: number;
+  pageSize: number;
+  utenteId?: string;
+  status?: string;
+  dentistaId?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<{ tratamentos: Tratamento[]; total: number; totalPages: number }> {
+  const { page, pageSize, utenteId, status, dentistaId, dataInicio, dataFim } = params;
+
+  if (useMockData) {
+    let filtered = [...tratamentosMock];
+
+    if (utenteId) {
+      filtered = filtered.filter(t => t.utenteId === utenteId);
+    }
+    if (status) {
+      filtered = filtered.filter(t => t.status === status);
+    }
+    if (dentistaId) {
+      filtered = filtered.filter(t => t.dentistaId === dentistaId);
+    }
+    if (dataInicio) {
+      filtered = filtered.filter(t => t.data >= dataInicio);
+    }
+    if (dataFim) {
+      filtered = filtered.filter(t => t.data <= dataFim);
+    }
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const start = (page - 1) * pageSize;
+    const tratamentos = filtered
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+      .slice(start, start + pageSize);
+
+    return { tratamentos, total, totalPages };
+  }
+
+  // Construir query dinâmica
+  const conditions: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (utenteId) {
+    conditions.push(`utente_id = $${paramIndex++}`);
+    values.push(utenteId);
+  }
+  if (status) {
+    conditions.push(`status = $${paramIndex++}`);
+    values.push(status);
+  }
+  if (dentistaId) {
+    conditions.push(`dentista_id = $${paramIndex++}`);
+    values.push(dentistaId);
+  }
+  if (dataInicio) {
+    conditions.push(`data >= $${paramIndex++}`);
+    values.push(dataInicio);
+  }
+  if (dataFim) {
+    conditions.push(`data <= $${paramIndex++}`);
+    values.push(dataFim);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Contar total
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as total FROM tratamentos ${whereClause}`,
+    values
+  );
+  const total = parseInt(countResult.rows[0].total);
+  const totalPages = Math.ceil(total / pageSize);
+
+  // Buscar dados paginados
+  const offset = (page - 1) * pageSize;
+  values.push(pageSize, offset);
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM tratamentos
+    ${whereClause}
+    ORDER BY data DESC
+    LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+    values
+  );
+
+  return {
+    tratamentos: result.rows,
+    total,
+    totalPages,
+  };
+}
+
+/**
+ * Obter tratamento por ID
+ */
+export async function obterTratamento(id: string): Promise<Tratamento | null> {
+  if (useMockData) {
+    return tratamentosMock.find(t => t.id === id) || null;
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM tratamentos
+    WHERE id = $1`,
+    [id]
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Criar tratamento
+ */
+export async function criarTratamento(dados: Omit<Tratamento, "id" | "criadoEm" | "atualizadoEm">): Promise<Tratamento> {
+  if (useMockData) {
+    const novoTratamento: Tratamento = {
+      ...dados,
+      id: `trat_${tratamentosMock.length + 1}`,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    };
+    tratamentosMock.push(novoTratamento);
+    return novoTratamento;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO tratamentos (
+      utente_id, consulta_id, dentista_id, data, dente, procedimento,
+      descricao, valor, valor_pago, status, observacoes, criado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"`,
+    [
+      dados.utenteId,
+      dados.consultaId || null,
+      dados.dentistaId || null,
+      dados.data,
+      dados.dente || null,
+      dados.procedimento,
+      dados.descricao || null,
+      dados.valor,
+      dados.valorPago,
+      dados.status,
+      dados.observacoes || null,
+      dados.criadoPor,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+/**
+ * Atualizar tratamento
+ */
+export async function atualizarTratamento(
+  id: string,
+  dados: Partial<Omit<Tratamento, "id" | "criadoEm" | "criadoPor">>
+): Promise<Tratamento | null> {
+  if (useMockData) {
+    const index = tratamentosMock.findIndex(t => t.id === id);
+    if (index === -1) return null;
+
+    tratamentosMock[index] = {
+      ...tratamentosMock[index],
+      ...dados,
+      atualizadoEm: new Date().toISOString(),
+    };
+    return tratamentosMock[index];
+  }
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (dados.consultaId !== undefined) {
+    fields.push(`consulta_id = $${paramIndex++}`);
+    values.push(dados.consultaId);
+  }
+  if (dados.dentistaId !== undefined) {
+    fields.push(`dentista_id = $${paramIndex++}`);
+    values.push(dados.dentistaId);
+  }
+  if (dados.data !== undefined) {
+    fields.push(`data = $${paramIndex++}`);
+    values.push(dados.data);
+  }
+  if (dados.dente !== undefined) {
+    fields.push(`dente = $${paramIndex++}`);
+    values.push(dados.dente);
+  }
+  if (dados.procedimento !== undefined) {
+    fields.push(`procedimento = $${paramIndex++}`);
+    values.push(dados.procedimento);
+  }
+  if (dados.descricao !== undefined) {
+    fields.push(`descricao = $${paramIndex++}`);
+    values.push(dados.descricao);
+  }
+  if (dados.valor !== undefined) {
+    fields.push(`valor = $${paramIndex++}`);
+    values.push(dados.valor);
+  }
+  if (dados.valorPago !== undefined) {
+    fields.push(`valor_pago = $${paramIndex++}`);
+    values.push(dados.valorPago);
+  }
+  if (dados.status !== undefined) {
+    fields.push(`status = $${paramIndex++}`);
+    values.push(dados.status);
+  }
+  if (dados.observacoes !== undefined) {
+    fields.push(`observacoes = $${paramIndex++}`);
+    values.push(dados.observacoes);
+  }
+  if (dados.atualizadoPor !== undefined) {
+    fields.push(`atualizado_por = $${paramIndex++}`);
+    values.push(dados.atualizadoPor);
+  }
+
+  if (fields.length === 0) return await obterTratamento(id);
+
+  fields.push(`atualizado_em = NOW()`);
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE tratamentos
+    SET ${fields.join(", ")}
+    WHERE id = $${paramIndex}
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      consulta_id as "consultaId",
+      dentista_id as "dentistaId",
+      data,
+      dente,
+      procedimento,
+      descricao,
+      valor,
+      valor_pago as "valorPago",
+      status,
+      observacoes,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"`,
+    values
+  );
+
+  return result.rows[0] || null;
+}
+
+/**
+ * Deletar tratamento
+ */
+export async function deletarTratamento(id: string): Promise<boolean> {
+  if (useMockData) {
+    const index = tratamentosMock.findIndex(t => t.id === id);
+    if (index === -1) return false;
+    tratamentosMock.splice(index, 1);
+    return true;
+  }
+
+  const result = await pool.query("DELETE FROM tratamentos WHERE id = $1", [id]);
+  return (result.rowCount || 0) > 0;
+}
+
+/**
+ * Obter estatísticas de tratamentos
+ */
+export async function obterEstatisticasTratamentos(params: {
+  utenteId?: string;
+  dentistaId?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<{
+  total: number;
+  planeados: number;
+  emAndamento: number;
+  concluidos: number;
+  cancelados: number;
+  valorTotal: number;
+  valorPago: number;
+  valorPendente: number;
+}> {
+  const { utenteId, dentistaId, dataInicio, dataFim } = params;
+
+  if (useMockData) {
+    let filtered = [...tratamentosMock];
+
+    if (utenteId) {
+      filtered = filtered.filter(t => t.utenteId === utenteId);
+    }
+    if (dentistaId) {
+      filtered = filtered.filter(t => t.dentistaId === dentistaId);
+    }
+    if (dataInicio) {
+      filtered = filtered.filter(t => t.data >= dataInicio);
+    }
+    if (dataFim) {
+      filtered = filtered.filter(t => t.data <= dataFim);
+    }
+
+    const valorTotal = filtered.reduce((sum, t) => sum + t.valor, 0);
+    const valorPago = filtered.reduce((sum, t) => sum + t.valorPago, 0);
+
+    return {
+      total: filtered.length,
+      planeados: filtered.filter(t => t.status === "planeado").length,
+      emAndamento: filtered.filter(t => t.status === "em_andamento").length,
+      concluidos: filtered.filter(t => t.status === "concluido").length,
+      cancelados: filtered.filter(t => t.status === "cancelado").length,
+      valorTotal,
+      valorPago,
+      valorPendente: valorTotal - valorPago,
+    };
+  }
+
+  const conditions: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (utenteId) {
+    conditions.push(`utente_id = $${paramIndex++}`);
+    values.push(utenteId);
+  }
+  if (dentistaId) {
+    conditions.push(`dentista_id = $${paramIndex++}`);
+    values.push(dentistaId);
+  }
+  if (dataInicio) {
+    conditions.push(`data >= $${paramIndex++}`);
+    values.push(dataInicio);
+  }
+  if (dataFim) {
+    conditions.push(`data <= $${paramIndex++}`);
+    values.push(dataFim);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const result = await pool.query(
+    `SELECT 
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE status = 'planeado') as planeados,
+      COUNT(*) FILTER (WHERE status = 'em_andamento') as "emAndamento",
+      COUNT(*) FILTER (WHERE status = 'concluido') as concluidos,
+      COUNT(*) FILTER (WHERE status = 'cancelado') as cancelados,
+      COALESCE(SUM(valor), 0) as "valorTotal",
+      COALESCE(SUM(valor_pago), 0) as "valorPago"
+    FROM tratamentos
+    ${whereClause}`,
+    values
+  );
+
+  const row = result.rows[0];
+  const valorTotal = parseFloat(row.valorTotal);
+  const valorPago = parseFloat(row.valorPago);
+
+  return {
+    total: parseInt(row.total),
+    planeados: parseInt(row.planeados),
+    emAndamento: parseInt(row.emAndamento),
+    concluidos: parseInt(row.concluidos),
+    cancelados: parseInt(row.cancelados),
+    valorTotal,
+    valorPago,
+    valorPendente: valorTotal - valorPago,
+  };
+}
+
+/**
+ * Exportar tratamentos
+ */
+export async function exportarTratamentos(params: {
+  utenteId?: string;
+  status?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<Tratamento[]> {
+  // Retorna todos os tratamentos filtrados (sem paginação)
+  const result = await listarTratamentosPaginado({
+    ...params,
+    page: 1,
+    pageSize: 10000, // Número grande para pegar todos
+  });
+
+  return result.tratamentos;
+}
+
+
+
+// ============================================================================
+// PRESCRIÇÕES
+// ============================================================================
+
+interface Medicamento {
+  medicamento: string;
+  posologia: string;
+  duracao: string;
+  quantidade?: string;
+}
+
+interface Prescricao {
+  id: string;
+  utenteId: string;
+  data: string;
+  medicamentos: Medicamento[];
+  observacoes?: string | null;
+  diagnostico?: string | null;
+  criadoPor: string;
+  atualizadoPor?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
+// Mock data de prescrições
+let prescricoesMock: Prescricao[] = [
+  {
+    id: "presc_1",
+    utenteId: "1",
+    data: "2025-10-20",
+    medicamentos: [
+      {
+        medicamento: "Amoxicilina 500mg",
+        posologia: "1 comprimido de 8 em 8 horas",
+        duracao: "7 dias",
+        quantidade: "21 comprimidos",
+      },
+      {
+        medicamento: "Ibuprofeno 600mg",
+        posologia: "1 comprimido de 8 em 8 horas (após refeições)",
+        duracao: "5 dias",
+        quantidade: "15 comprimidos",
+      },
+    ],
+    diagnostico: "Infecção dentária aguda",
+    observacoes: "Tomar com alimentos. Evitar álcool durante o tratamento.",
+    criadoPor: "1",
+    criadoEm: new Date("2025-10-20").toISOString(),
+    atualizadoEm: new Date("2025-10-20").toISOString(),
+  },
+  {
+    id: "presc_2",
+    utenteId: "2",
+    data: "2025-10-22",
+    medicamentos: [
+      {
+        medicamento: "Paracetamol 1000mg",
+        posologia: "1 comprimido de 6 em 6 horas (SOS dor)",
+        duracao: "3 dias",
+        quantidade: "12 comprimidos",
+      },
+    ],
+    diagnostico: "Dor pós-operatória",
+    observacoes: "Usar apenas se necessário para controlo da dor.",
+    criadoPor: "1",
+    criadoEm: new Date("2025-10-22").toISOString(),
+    atualizadoEm: new Date("2025-10-22").toISOString(),
+  },
+];
+
+/**
+ * Listar prescrições de um utente
+ */
+export async function listarPrescricoes(utenteId: string): Promise<Prescricao[]> {
+  if (useMockData) {
+    return prescricoesMock
+      .filter(p => p.utenteId === utenteId)
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicamentos,
+      observacoes,
+      diagnostico,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM prescricoes
+    WHERE utente_id = $1
+    ORDER BY data DESC`,
+    [utenteId]
+  );
+
+  return result.rows.map(row => ({
+    ...row,
+    medicamentos: JSON.parse(row.medicamentos),
+  }));
+}
+
+/**
+ * Listar prescrições com paginação
+ */
+export async function listarPrescricoesPaginado(params: {
+  page: number;
+  pageSize: number;
+  utenteId?: string;
+  dataInicio?: string;
+  dataFim?: string;
+}): Promise<{ prescricoes: Prescricao[]; total: number; totalPages: number }> {
+  const { page, pageSize, utenteId, dataInicio, dataFim } = params;
+
+  if (useMockData) {
+    let filtered = [...prescricoesMock];
+
+    if (utenteId) {
+      filtered = filtered.filter(p => p.utenteId === utenteId);
+    }
+    if (dataInicio) {
+      filtered = filtered.filter(p => p.data >= dataInicio);
+    }
+    if (dataFim) {
+      filtered = filtered.filter(p => p.data <= dataFim);
+    }
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const start = (page - 1) * pageSize;
+    const prescricoes = filtered
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+      .slice(start, start + pageSize);
+
+    return { prescricoes, total, totalPages };
+  }
+
+  const conditions: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (utenteId) {
+    conditions.push(`utente_id = $${paramIndex++}`);
+    values.push(utenteId);
+  }
+  if (dataInicio) {
+    conditions.push(`data >= $${paramIndex++}`);
+    values.push(dataInicio);
+  }
+  if (dataFim) {
+    conditions.push(`data <= $${paramIndex++}`);
+    values.push(dataFim);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as total FROM prescricoes ${whereClause}`,
+    values
+  );
+  const total = parseInt(countResult.rows[0].total);
+  const totalPages = Math.ceil(total / pageSize);
+
+  const offset = (page - 1) * pageSize;
+  values.push(pageSize, offset);
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicamentos,
+      observacoes,
+      diagnostico,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM prescricoes
+    ${whereClause}
+    ORDER BY data DESC
+    LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+    values
+  );
+
+  return {
+    prescricoes: result.rows.map(row => ({
+      ...row,
+      medicamentos: JSON.parse(row.medicamentos),
+    })),
+    total,
+    totalPages,
+  };
+}
+
+/**
+ * Obter prescrição por ID
+ */
+export async function obterPrescricao(id: string): Promise<Prescricao | null> {
+  if (useMockData) {
+    return prescricoesMock.find(p => p.id === id) || null;
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicamentos,
+      observacoes,
+      diagnostico,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"
+    FROM prescricoes
+    WHERE id = $1`,
+    [id]
+  );
+
+  if (result.rows.length === 0) return null;
+
+  return {
+    ...result.rows[0],
+    medicamentos: JSON.parse(result.rows[0].medicamentos),
+  };
+}
+
+/**
+ * Criar prescrição
+ */
+export async function criarPrescricao(dados: Omit<Prescricao, "id" | "criadoEm" | "atualizadoEm">): Promise<Prescricao> {
+  if (useMockData) {
+    const novaPrescricao: Prescricao = {
+      ...dados,
+      id: `presc_${prescricoesMock.length + 1}`,
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString(),
+    };
+    prescricoesMock.push(novaPrescricao);
+    return novaPrescricao;
+  }
+
+  const result = await pool.query(
+    `INSERT INTO prescricoes (
+      utente_id, data, medicamentos, observacoes, diagnostico, criado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicamentos,
+      observacoes,
+      diagnostico,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"`,
+    [
+      dados.utenteId,
+      dados.data,
+      JSON.stringify(dados.medicamentos),
+      dados.observacoes || null,
+      dados.diagnostico || null,
+      dados.criadoPor,
+    ]
+  );
+
+  return {
+    ...result.rows[0],
+    medicamentos: JSON.parse(result.rows[0].medicamentos),
+  };
+}
+
+/**
+ * Atualizar prescrição
+ */
+export async function atualizarPrescricao(
+  id: string,
+  dados: Partial<Omit<Prescricao, "id" | "criadoEm" | "criadoPor">>
+): Promise<Prescricao | null> {
+  if (useMockData) {
+    const index = prescricoesMock.findIndex(p => p.id === id);
+    if (index === -1) return null;
+
+    prescricoesMock[index] = {
+      ...prescricoesMock[index],
+      ...dados,
+      atualizadoEm: new Date().toISOString(),
+    };
+    return prescricoesMock[index];
+  }
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (dados.data !== undefined) {
+    fields.push(`data = $${paramIndex++}`);
+    values.push(dados.data);
+  }
+  if (dados.medicamentos !== undefined) {
+    fields.push(`medicamentos = $${paramIndex++}`);
+    values.push(JSON.stringify(dados.medicamentos));
+  }
+  if (dados.observacoes !== undefined) {
+    fields.push(`observacoes = $${paramIndex++}`);
+    values.push(dados.observacoes);
+  }
+  if (dados.diagnostico !== undefined) {
+    fields.push(`diagnostico = $${paramIndex++}`);
+    values.push(dados.diagnostico);
+  }
+  if (dados.atualizadoPor !== undefined) {
+    fields.push(`atualizado_por = $${paramIndex++}`);
+    values.push(dados.atualizadoPor);
+  }
+
+  if (fields.length === 0) return await obterPrescricao(id);
+
+  fields.push(`atualizado_em = NOW()`);
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE prescricoes
+    SET ${fields.join(", ")}
+    WHERE id = $${paramIndex}
+    RETURNING 
+      id,
+      utente_id as "utenteId",
+      data,
+      medicamentos,
+      observacoes,
+      diagnostico,
+      criado_por as "criadoPor",
+      atualizado_por as "atualizadoPor",
+      criado_em as "criadoEm",
+      atualizado_em as "atualizadoEm"`,
+    values
+  );
+
+  if (result.rows.length === 0) return null;
+
+  return {
+    ...result.rows[0],
+    medicamentos: JSON.parse(result.rows[0].medicamentos),
+  };
+}
+
+/**
+ * Eliminar prescrição
+ */
+export async function eliminarPrescricao(id: string): Promise<boolean> {
+  if (useMockData) {
+    const index = prescricoesMock.findIndex(p => p.id === id);
+    if (index === -1) return false;
+    prescricoesMock.splice(index, 1);
+    return true;
+  }
+
+  const result = await pool.query("DELETE FROM prescricoes WHERE id = $1", [id]);
+  return (result.rowCount || 0) > 0;
+}
+
+/**
+ * Gerar PDF da prescrição
+ */
+export async function gerarPdfPrescricao(id: string): Promise<{ url: string }> {
+  // Implementação simplificada - retorna URL mockada
+  // Em produção, geraria PDF real com jsPDF
+  return {
+    url: `/api/prescricoes/${id}/pdf`,
+  };
+}
+
+// ============================================================================
+// MEDICAMENTOS
+// ============================================================================
+
+interface MedicamentoInfo {
+  id: string;
+  nome: string;
+  principioAtivo?: string;
+  forma?: string;
+  dosagem?: string;
+  laboratorio?: string;
+  categoria?: string;
+}
+
+// Mock data de medicamentos comuns em odontologia
+let medicamentosMock: MedicamentoInfo[] = [
+  {
+    id: "med_1",
+    nome: "Amoxicilina 500mg",
+    principioAtivo: "Amoxicilina",
+    forma: "Comprimido",
+    dosagem: "500mg",
+    categoria: "Antibiótico",
+  },
+  {
+    id: "med_2",
+    nome: "Amoxicilina + Ácido Clavulânico 875mg + 125mg",
+    principioAtivo: "Amoxicilina + Ácido Clavulânico",
+    forma: "Comprimido",
+    dosagem: "875mg + 125mg",
+    categoria: "Antibiótico",
+  },
+  {
+    id: "med_3",
+    nome: "Azitromicina 500mg",
+    principioAtivo: "Azitromicina",
+    forma: "Comprimido",
+    dosagem: "500mg",
+    categoria: "Antibiótico",
+  },
+  {
+    id: "med_4",
+    nome: "Ibuprofeno 600mg",
+    principioAtivo: "Ibuprofeno",
+    forma: "Comprimido",
+    dosagem: "600mg",
+    categoria: "Anti-inflamatório",
+  },
+  {
+    id: "med_5",
+    nome: "Paracetamol 1000mg",
+    principioAtivo: "Paracetamol",
+    forma: "Comprimido",
+    dosagem: "1000mg",
+    categoria: "Analgésico",
+  },
+  {
+    id: "med_6",
+    nome: "Nimesulida 100mg",
+    principioAtivo: "Nimesulida",
+    forma: "Comprimido",
+    dosagem: "100mg",
+    categoria: "Anti-inflamatório",
+  },
+  {
+    id: "med_7",
+    nome: "Metronidazol 400mg",
+    principioAtivo: "Metronidazol",
+    forma: "Comprimido",
+    dosagem: "400mg",
+    categoria: "Antibiótico",
+  },
+  {
+    id: "med_8",
+    nome: "Dexametasona 4mg",
+    principioAtivo: "Dexametasona",
+    forma: "Comprimido",
+    dosagem: "4mg",
+    categoria: "Corticosteroide",
+  },
+  {
+    id: "med_9",
+    nome: "Clorexidina 0,12%",
+    principioAtivo: "Clorexidina",
+    forma: "Solução oral",
+    dosagem: "0,12%",
+    categoria: "Antisséptico",
+  },
+  {
+    id: "med_10",
+    nome: "Tramadol 50mg",
+    principioAtivo: "Tramadol",
+    forma: "Cápsula",
+    dosagem: "50mg",
+    categoria: "Analgésico opioide",
+  },
+];
+
+/**
+ * Buscar medicamentos por nome
+ */
+export async function buscarMedicamentos(termo: string): Promise<MedicamentoInfo[]> {
+  if (useMockData) {
+    const termoLower = termo.toLowerCase();
+    return medicamentosMock.filter(
+      m =>
+        m.nome.toLowerCase().includes(termoLower) ||
+        m.principioAtivo?.toLowerCase().includes(termoLower)
+    );
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      nome,
+      principio_ativo as "principioAtivo",
+      forma,
+      dosagem,
+      laboratorio,
+      categoria
+    FROM medicamentos
+    WHERE 
+      LOWER(nome) LIKE LOWER($1) OR
+      LOWER(principio_ativo) LIKE LOWER($1)
+    ORDER BY nome
+    LIMIT 20`,
+    [`%${termo}%`]
+  );
+
+  return result.rows;
+}
+
+/**
+ * Listar medicamentos mais usados
+ */
+export async function listarMedicamentosMaisUsados(limite: number): Promise<MedicamentoInfo[]> {
+  if (useMockData) {
+    // Retorna os primeiros N medicamentos como "mais usados"
+    return medicamentosMock.slice(0, limite);
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      m.id,
+      m.nome,
+      m.principio_ativo as "principioAtivo",
+      m.forma,
+      m.dosagem,
+      m.laboratorio,
+      m.categoria,
+      COUNT(p.id) as uso_count
+    FROM medicamentos m
+    LEFT JOIN prescricoes p ON p.medicamentos::text LIKE '%' || m.nome || '%'
+    GROUP BY m.id
+    ORDER BY uso_count DESC, m.nome
+    LIMIT $1`,
+    [limite]
+  );
+
+  return result.rows;
+}
+
+/**
+ * Obter informações de um medicamento
+ */
+export async function obterMedicamento(id: string): Promise<MedicamentoInfo | null> {
+  if (useMockData) {
+    return medicamentosMock.find(m => m.id === id) || null;
+  }
+
+  const result = await pool.query(
+    `SELECT 
+      id,
+      nome,
+      principio_ativo as "principioAtivo",
+      forma,
+      dosagem,
+      laboratorio,
+      categoria
+    FROM medicamentos
+    WHERE id = $1`,
+    [id]
+  );
+
+  return result.rows[0] || null;
 }
 
