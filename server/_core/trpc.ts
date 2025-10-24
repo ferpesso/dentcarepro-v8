@@ -1,8 +1,8 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 // import superjson from "superjson"; // ❌ REMOVIDO TEMPORARIAMENTE
 import type { TrpcContext } from "./context";
 import * as db from "../db";
+import { UNAUTHED_ERR_MSG, NOT_ADMIN_ERR_MSG } from "../../shared/const";
 
 const t = initTRPC.context<TrpcContext>().create({
   // transformer: superjson, // ❌ REMOVIDO TEMPORARIAMENTE
@@ -58,7 +58,7 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = t.procedure; // Desativado temporariamente para diagnóstico
 
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
