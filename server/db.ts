@@ -4493,3 +4493,10 @@ export async function exportarRelatorio(dados: {
   throw new Error("Not implemented");
 }
 
+
+
+// ========================================
+// EXPORTAR FUNÇÕES DOS NOVOS MÓDULOS (STUBS)
+// ========================================
+export * from "./db-stubs";
+

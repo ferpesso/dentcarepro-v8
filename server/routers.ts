@@ -20,6 +20,14 @@ import { bloqueiosAgendaRouter } from "./routers/bloqueios-agenda";
 import { listaEsperaRouter } from "./routers/lista-espera";
 import { portalPacienteRouter } from "./routers/portal-paciente";
 import { relatoriosRouter } from "./routers/relatorios";
+import { imagensClinicasRouter } from "./routers/imagens-clinicas";
+import { endodontiaRouter } from "./routers/endodontia";
+import { implantesRouter } from "./routers/implantes";
+import { ortodontiaRouter } from "./routers/ortodontia";
+import { consentimentosRouter } from "./routers/consentimentos";
+import { anamneseRouter } from "./routers/anamnese";
+import { lembretesRouter } from "./routers/lembretes";
+import { estoqueRouter } from "./routers/estoque";
 
 export const appRouter = router({
   system: systemRouter,
@@ -595,6 +603,46 @@ export const appRouter = router({
   // RELATÓRIOS
   // ========================================
   relatorios: relatoriosRouter,
+
+  // ========================================
+  // IMAGENS CLÍNICAS
+  // ========================================
+  imagensClinicas: imagensClinicasRouter,
+
+  // ========================================
+  // ENDODONTIA
+  // ========================================
+  endodontia: endodontiaRouter,
+
+  // ========================================
+  // IMPLANTES
+  // ========================================
+  implantes: implantesRouter,
+
+  // ========================================
+  // ORTODONTIA
+  // ========================================
+  ortodontia: ortodontiaRouter,
+
+  // ========================================
+  // CONSENTIMENTOS INFORMADOS
+  // ========================================
+  consentimentos: consentimentosRouter,
+
+  // ========================================
+  // ANAMNESE
+  // ========================================
+  anamnese: anamneseRouter,
+
+  // ========================================
+  // LEMBRETES E NOTIFICAÇÕES
+  // ========================================
+  lembretes: lembretesRouter,
+
+  // ========================================
+  // ESTOQUE/INVENTÁRIO
+  // ========================================
+  estoque: estoqueRouter,
 });
 
 export type AppRouter = typeof appRouter;
