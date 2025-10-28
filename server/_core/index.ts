@@ -34,16 +34,16 @@ async function startServer() {
   
   // CORS configuration for Vercel frontend
   app.use((req, res, next) => {
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'https://dentcarepro-v8.vercel.app',
-      'https://dentcare-pro.vercel.app',
-      'https://web-production-1be3.up.railway.app'
-    ];
-    
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+    
+    // Allow all Vercel deployments and localhost
+    const isAllowed = origin && (
+      origin.includes('vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('railway.app')
+    );
+    
+    if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
     }
     
