@@ -36,6 +36,7 @@ import AssistenteDiagnostico from "@/components/AssistenteDiagnostico";
 import VerificadorMedicamentos from "@/components/VerificadorMedicamentos";
 import AssistenteNotas from "@/components/AssistenteNotas";
 import AssistenteVirtual from "@/components/AssistenteVirtual";
+import TimelineUtente from "@/components/TimelineUtente";
 
 export default function UtenteDetail() {
   const [, params] = useRoute("/utentes/:id");
@@ -578,23 +579,7 @@ export default function UtenteDetail() {
 
           {/* Tab: Histórico */}
           <TabsContent value="historico" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico de Atividades</CardTitle>
-                <CardDescription>
-                  Consultas, tratamentos e atualizações do utente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Histórico em desenvolvimento</p>
-                  <p className="text-sm">
-                    Esta funcionalidade estará disponível em breve
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <TimelineUtente utenteId={utenteId!} />
           </TabsContent>
         </Tabs>
       </div>
