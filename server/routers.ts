@@ -30,6 +30,7 @@ import { lembretesRouter } from "./routers/lembretes";
 import { estoqueRouter } from "./routers/estoque";
 import { integracaoRouter } from "./routers/integracao";
 import { authRouter } from "./routers/auth";
+import { consultasRouter } from "./routers/consultas";
 
 export const appRouter = router({
   system: systemRouter,
@@ -372,163 +373,8 @@ export const appRouter = router({
   // imagens: imagensRouter,
 
   // ========================================
-  // CONSULTAS
+  // CONSULTAS (removido inline - agora usa router importado)
   // ========================================
-  consultas: router({
-    // Listar todas as consultas
-    listar: protectedProcedure.query(async () => {
-      const { listarConsultas } = await import("./db");
-      return await listarConsultas();
-    }),
-
-    // Obter consulta por ID
-    obter: protectedProcedure
-      .input(z.object({ id: z.string() }))
-      .query(async ({ input }) => {
-        const { obterConsulta } = await import("./db");
-        return await obterConsulta(input.id);
-      }),
-
-    // Criar nova consulta
-    criar: protectedProcedure
-      .input(
-        z.object({
-          utenteId: z.string(),
-          medicoId: z.string().optional().nullable(),
-          dataHora: z.string(),
-          duracao: z.number().optional(),
-          tipoConsulta: z.string().optional().nullable(),
-          procedimento: z.string().optional().nullable(),
-          status: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'faltou', 'em_atendimento']).optional(),
-          observacoes: z.string().optional().nullable(),
-          valorEstimado: z.number().optional().nullable(),
-          classificacaoRisco: z.string().optional().nullable(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const { criarConsulta, verificarConflito } = await import("./db");
-        
-        // Verificar conflito se tiver médico
-        if (input.medicoId) {
-          const temConflito = await verificarConflito(
-            input.medicoId,
-            input.dataHora,
-            input.duracao || 30
-          );
-          
-          if (temConflito) {
-            throw new Error("Já existe uma consulta agendada para este médico neste horário");
-          }
-        }
-        
-        return await criarConsulta(input);
-      }),
-
-    // Atualizar consulta
-    atualizar: protectedProcedure
-      .input(
-        z.object({
-          id: z.string(),
-          utenteId: z.string().optional(),
-          medicoId: z.string().optional().nullable(),
-          dataHora: z.string().optional(),
-          duracao: z.number().optional(),
-          tipoConsulta: z.string().optional().nullable(),
-          procedimento: z.string().optional().nullable(),
-          status: z.enum(['agendada', 'confirmada', 'realizada', 'cancelada', 'faltou', 'em_atendimento']).optional(),
-          observacoes: z.string().optional().nullable(),
-          valorEstimado: z.number().optional().nullable(),
-          classificacaoRisco: z.string().optional().nullable(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const { atualizarConsulta, verificarConflito, obterConsulta } = await import("./db");
-        
-        // Se estiver alterando médico, data ou duração, verificar conflito
-        if (input.medicoId || input.dataHora || input.duracao) {
-          const consultaAtual = await obterConsulta(input.id);
-          const medicoId = input.medicoId !== undefined ? input.medicoId : consultaAtual.medicoId;
-          const dataHora = input.dataHora || consultaAtual.dataHora;
-          const duracao = input.duracao || consultaAtual.duracao;
-          
-          if (medicoId) {
-            const temConflito = await verificarConflito(
-              medicoId,
-              dataHora,
-              duracao,
-              input.id
-            );
-            
-            if (temConflito) {
-              throw new Error("Já existe uma consulta agendada para este médico neste horário");
-            }
-          }
-        }
-        
-        const { id, ...dados } = input;
-        return await atualizarConsulta(id, dados);
-      }),
-
-    // Remover consulta
-    remover: protectedProcedure
-      .input(z.object({ id: z.string() }))
-      .mutation(async ({ input }) => {
-        const { removerConsulta } = await import("./db");
-        await removerConsulta(input.id);
-        return { success: true };
-      }),
-
-    // Listar consultas por data
-    listarPorData: protectedProcedure
-      .input(z.object({ data: z.string() }))
-      .query(async ({ input }) => {
-        const { listarConsultasPorData } = await import("./db");
-        return await listarConsultasPorData(input.data);
-      }),
-
-    // Listar consultas por período
-    listarPorPeriodo: protectedProcedure
-      .input(z.object({ 
-        dataInicio: z.string(),
-        dataFim: z.string()
-      }))
-      .query(async ({ input }) => {
-        const { listarConsultasPorPeriodo } = await import("./db");
-        return await listarConsultasPorPeriodo(input.dataInicio, input.dataFim);
-      }),
-
-    // Listar consultas por médico
-    listarPorMedico: protectedProcedure
-      .input(z.object({ medicoId: z.string() }))
-      .query(async ({ input }) => {
-        const { listarConsultasPorMedico } = await import("./db");
-        return await listarConsultasPorMedico(input.medicoId);
-      }),
-
-    // Verificar conflito de horário
-    verificarConflito: protectedProcedure
-      .input(z.object({
-        medicoId: z.string(),
-        dataHora: z.string(),
-        duracao: z.number(),
-        consultaIdExcluir: z.string().optional()
-      }))
-      .query(async ({ input }) => {
-        const { verificarConflito } = await import("./db");
-        return await verificarConflito(
-          input.medicoId,
-          input.dataHora,
-          input.duracao,
-          input.consultaIdExcluir
-        );
-      }),
-
-    // Obter estatísticas
-    estatisticas: protectedProcedure.query(async () => {
-      const { obterEstatisticasConsultas } = await import("./db");
-      return await obterEstatisticasConsultas();
-    }),
-  }),
 
   // ========================================
   // FINANCEIRO / FATURAÇÃO
@@ -650,6 +496,11 @@ export const appRouter = router({
   // ========================================
   estoque: estoqueRouter,
   integracao: integracaoRouter,
+
+  // ========================================
+  // CONSULTAS/AGENDAMENTO
+  // ========================================
+  consultas: consultasRouter,
 });
 
 export type AppRouter = typeof appRouter;

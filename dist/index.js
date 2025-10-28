@@ -16,184 +16,310 @@ __export(schema_exports, {
   configClinica: () => configClinica,
   configComissoes: () => configComissoes,
   consultas: () => consultas,
+  contasPagar: () => contasPagar,
   dentistas: () => dentistas,
   faturas: () => faturas,
   historicoUtente: () => historicoUtente,
+  itensFatura: () => itensFatura,
+  laboratorios: () => laboratorios,
   notifications: () => notifications,
+  pagamentos: () => pagamentos,
+  prescricoes: () => prescricoes,
   procedimentosClinicos: () => procedimentosClinicos,
   tabelaPrecos: () => tabelaPrecos,
+  trabalhosLaboratorio: () => trabalhosLaboratorio,
+  tratamentos: () => tratamentos,
   userPermissions: () => userPermissions,
   userSessions: () => userSessions,
   users: () => users,
   utentes: () => utentes
 });
-import { pgTable, varchar, text, timestamp, integer, decimal, boolean } from "drizzle-orm/pg-core";
-var users, userSessions, utentes, consultas, faturas, dentistas, comissoes, configComissoes, historicoUtente, procedimentosClinicos, tabelaPrecos, auditLog, notifications, userPermissions, configClinica;
+import { pgTable, varchar, text, timestamp, integer, decimal, boolean, date } from "drizzle-orm/pg-core";
+var users, userSessions, utentes, consultas, tratamentos, faturas, itensFatura, pagamentos, prescricoes, comissoes, configComissoes, laboratorios, trabalhosLaboratorio, contasPagar, dentistas, historicoUtente, procedimentosClinicos, tabelaPrecos, auditLog, notifications, userPermissions, configClinica;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
     users = pgTable("users", {
-      id: varchar("id", { length: 50 }).primaryKey(),
+      id: varchar("id", { length: 255 }).primaryKey(),
       name: varchar("name", { length: 255 }).notNull(),
       email: varchar("email", { length: 255 }).notNull(),
-      loginMethod: varchar("login_method", { length: 50 }),
-      role: varchar("role", { length: 50 }).default("user"),
-      lastSignedIn: timestamp("last_signed_in"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow(),
       passwordHash: varchar("password_hash", { length: 255 }),
-      status: varchar("status", { length: 20 }).default("ativo"),
-      dentistaId: varchar("dentista_id", { length: 64 }),
+      role: varchar("role", { length: 50 }).default("user").notNull(),
+      status: varchar("status", { length: 50 }).default("active").notNull(),
+      loginMethod: varchar("login_method", { length: 50 }),
+      dentistaId: varchar("dentista_id", { length: 255 }),
       resetToken: varchar("reset_token", { length: 255 }),
       resetTokenExpires: timestamp("reset_token_expires"),
-      emailVerified: integer("email_verified").default(0)
+      telefone: varchar("telefone", { length: 50 }),
+      especialidade: varchar("especialidade", { length: 100 }),
+      numeroOrdem: varchar("numero_ordem", { length: 50 }),
+      fotoUrl: varchar("foto_url", { length: 500 }),
+      ativo: boolean("ativo").default(true),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     userSessions = pgTable("user_sessions", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      userId: varchar("user_id", { length: 50 }).notNull(),
+      userId: varchar("user_id", { length: 255 }).notNull(),
       token: text("token").notNull(),
       expiresAt: timestamp("expires_at").notNull(),
-      createdAt: timestamp("created_at").defaultNow(),
-      ipAddress: varchar("ip_address", { length: 45 }),
-      userAgent: text("user_agent")
+      createdAt: timestamp("created_at").defaultNow()
     });
     utentes = pgTable("utentes", {
-      id: varchar("id", { length: 36 }).primaryKey(),
-      numeroUtente: varchar("numero_utente", { length: 20 }).notNull().unique(),
-      nomeCompleto: varchar("nome_completo", { length: 200 }).notNull(),
-      dataNascimento: varchar("data_nascimento", { length: 10 }).notNull(),
-      genero: varchar("genero", { length: 10 }).notNull(),
-      nif: varchar("nif", { length: 9 }),
-      numUtenteSns: varchar("num_utente_sns", { length: 9 }),
-      fotoPerfil: text("foto_perfil"),
-      contacto: text("contacto"),
+      id: varchar("id", { length: 255 }).primaryKey(),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      email: varchar("email", { length: 255 }),
+      telefone: varchar("telefone", { length: 50 }),
+      dataNascimento: date("data_nascimento"),
+      nif: varchar("nif", { length: 50 }),
       morada: text("morada"),
-      infoMedica: text("info_medica").notNull(),
-      status: varchar("status", { length: 20 }).notNull().default("ativo"),
-      tags: text("tags"),
-      criadoPor: varchar("criado_por", { length: 64 }).notNull(),
-      criadoEm: timestamp("criado_em").defaultNow(),
-      atualizadoEm: timestamp("atualizado_em").defaultNow()
+      genero: varchar("genero", { length: 20 }),
+      profissao: varchar("profissao", { length: 100 }),
+      estadoCivil: varchar("estado_civil", { length: 50 }),
+      contactoEmergencia: varchar("contacto_emergencia", { length: 255 }),
+      telefoneEmergencia: varchar("telefone_emergencia", { length: 50 }),
+      alergias: text("alergias"),
+      medicamentosUso: text("medicamentos_uso"),
+      observacoesMedicas: text("observacoes_medicas"),
+      notas: text("notas"),
+      ativo: boolean("ativo").default(true),
+      fotoUrl: varchar("foto_url", { length: 500 }),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     consultas = pgTable("consultas", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      utenteId: varchar("utente_id", { length: 255 }).notNull(),
-      medicoId: varchar("medico_id", { length: 255 }),
+      utenteId: varchar("utente_id", { length: 255 }),
+      dentistaId: varchar("dentista_id", { length: 255 }),
       dataHora: timestamp("data_hora").notNull(),
       duracao: integer("duracao").default(30),
-      tipoConsulta: varchar("tipo_consulta", { length: 100 }),
-      procedimento: text("procedimento"),
+      tipo: varchar("tipo", { length: 100 }),
       status: varchar("status", { length: 50 }).default("agendada"),
-      observacoes: text("observacoes"),
-      valorEstimado: decimal("valor_estimado", { precision: 10, scale: 2 }),
-      classificacaoRisco: varchar("classificacao_risco", { length: 10 }),
-      criadoEm: timestamp("criado_em").defaultNow(),
-      atualizadoEm: timestamp("atualizado_em").defaultNow()
+      notas: text("notas"),
+      valor: decimal("valor", { precision: 10, scale: 2 }),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    tratamentos = pgTable("tratamentos", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      utenteId: varchar("utente_id", { length: 255 }),
+      consultaId: varchar("consulta_id", { length: 255 }),
+      dentistaId: varchar("dentista_id", { length: 255 }),
+      tipo: varchar("tipo", { length: 100 }).notNull(),
+      descricao: text("descricao"),
+      dente: varchar("dente", { length: 10 }),
+      faces: varchar("faces", { length: 50 }),
+      valor: decimal("valor", { precision: 10, scale: 2 }),
+      status: varchar("status", { length: 50 }).default("planejado"),
+      dataPlanejamento: date("data_planejamento"),
+      dataRealizacao: date("data_realizacao"),
+      notas: text("notas"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     faturas = pgTable("faturas", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      numero: varchar("numero", { length: 50 }).notNull().unique(),
-      utenteId: varchar("utente_id", { length: 255 }).notNull(),
-      data: timestamp("data").notNull(),
+      utenteId: varchar("utente_id", { length: 255 }),
+      consultaId: varchar("consulta_id", { length: 255 }),
+      numeroFatura: varchar("numero_fatura", { length: 100 }),
+      dataEmissao: date("data_emissao").notNull(),
+      dataVencimento: date("data_vencimento"),
       valorTotal: decimal("valor_total", { precision: 10, scale: 2 }).notNull(),
       valorPago: decimal("valor_pago", { precision: 10, scale: 2 }).default("0"),
+      desconto: decimal("desconto", { precision: 10, scale: 2 }).default("0"),
       status: varchar("status", { length: 50 }).default("pendente"),
       metodoPagamento: varchar("metodo_pagamento", { length: 50 }),
       observacoes: text("observacoes"),
-      criadoEm: timestamp("criado_em").defaultNow(),
-      atualizadoEm: timestamp("atualizado_em").defaultNow()
+      notas: text("notas"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
-    dentistas = pgTable("dentistas", {
+    itensFatura = pgTable("itens_fatura", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      nome: varchar("nome", { length: 255 }).notNull(),
-      especialidade: varchar("especialidade", { length: 100 }),
-      numeroOrdem: varchar("numero_ordem", { length: 50 }),
-      contacto: text("contacto"),
-      ativo: boolean("ativo").default(true),
-      criadoEm: timestamp("criado_em").defaultNow()
+      faturaId: varchar("fatura_id", { length: 255 }),
+      tratamentoId: varchar("tratamento_id", { length: 255 }),
+      descricao: varchar("descricao", { length: 255 }).notNull(),
+      quantidade: integer("quantidade").default(1),
+      valorUnitario: decimal("valor_unitario", { precision: 10, scale: 2 }).notNull(),
+      valorTotal: decimal("valor_total", { precision: 10, scale: 2 }).notNull(),
+      createdAt: timestamp("created_at").defaultNow()
+    });
+    pagamentos = pgTable("pagamentos", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      faturaId: varchar("fatura_id", { length: 255 }),
+      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
+      formaPagamento: varchar("forma_pagamento", { length: 50 }).notNull(),
+      dataPagamento: date("data_pagamento").notNull(),
+      referencia: varchar("referencia", { length: 100 }),
+      notas: text("notas"),
+      createdAt: timestamp("created_at").defaultNow()
+    });
+    prescricoes = pgTable("prescricoes", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      utenteId: varchar("utente_id", { length: 255 }),
+      consultaId: varchar("consulta_id", { length: 255 }),
+      dentistaId: varchar("dentista_id", { length: 255 }),
+      medicamento: varchar("medicamento", { length: 255 }).notNull(),
+      dosagem: varchar("dosagem", { length: 100 }),
+      frequencia: varchar("frequencia", { length: 100 }),
+      duracao: varchar("duracao", { length: 100 }),
+      viaAdministracao: varchar("via_administracao", { length: 50 }),
+      notas: text("notas"),
+      dataPrescricao: date("data_prescricao"),
+      createdAt: timestamp("created_at").defaultNow()
     });
     comissoes = pgTable("comissoes", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      dentistaId: varchar("dentista_id", { length: 255 }).notNull(),
+      dentistaId: varchar("dentista_id", { length: 255 }),
       faturaId: varchar("fatura_id", { length: 255 }),
       valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
-      percentual: decimal("percentual", { precision: 5, scale: 2 }),
+      percentagem: decimal("percentagem", { precision: 5, scale: 2 }),
       status: varchar("status", { length: 50 }).default("pendente"),
-      dataCriacao: timestamp("data_criacao").defaultNow(),
-      dataPagamento: timestamp("data_pagamento"),
-      formaPagamento: varchar("forma_pagamento", { length: 50 }),
-      observacoes: text("observacoes")
+      dataPagamento: date("data_pagamento"),
+      createdAt: timestamp("created_at").defaultNow()
     });
     configComissoes = pgTable("config_comissoes", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      dentistaId: varchar("dentista_id", { length: 255 }).notNull().unique(),
-      percentualPadrao: decimal("percentual_padrao", { precision: 5, scale: 2 }).default("30"),
-      tipoCalculo: varchar("tipo_calculo", { length: 50 }).default("percentual"),
+      dentistaId: varchar("dentista_id", { length: 255 }),
+      percentagemPadrao: decimal("percentagem_padrao", { precision: 5, scale: 2 }),
+      percentagemConsulta: decimal("percentagem_consulta", { precision: 5, scale: 2 }),
+      percentagemTratamento: decimal("percentagem_tratamento", { precision: 5, scale: 2 }),
       ativo: boolean("ativo").default(true),
-      criadoEm: timestamp("criado_em").defaultNow(),
-      atualizadoEm: timestamp("atualizado_em").defaultNow()
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    laboratorios = pgTable("laboratorios", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      contato: varchar("contato", { length: 255 }),
+      telefone: varchar("telefone", { length: 50 }),
+      email: varchar("email", { length: 255 }),
+      morada: text("morada"),
+      nif: varchar("nif", { length: 50 }),
+      notas: text("notas"),
+      ativo: boolean("ativo").default(true),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    trabalhosLaboratorio = pgTable("trabalhos_laboratorio", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      laboratorioId: varchar("laboratorio_id", { length: 255 }),
+      utenteId: varchar("utente_id", { length: 255 }),
+      consultaId: varchar("consulta_id", { length: 255 }),
+      dentistaId: varchar("dentista_id", { length: 255 }),
+      tipoTrabalho: varchar("tipo_trabalho", { length: 100 }).notNull(),
+      descricao: text("descricao"),
+      dentes: varchar("dentes", { length: 100 }),
+      cor: varchar("cor", { length: 50 }),
+      dataEnvio: date("data_envio"),
+      dataPrevistaEntrega: date("data_prevista_entrega"),
+      dataEntregaReal: date("data_entrega_real"),
+      valor: decimal("valor", { precision: 10, scale: 2 }),
+      status: varchar("status", { length: 50 }).default("enviado"),
+      notas: text("notas"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    contasPagar = pgTable("contas_pagar", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      descricao: varchar("descricao", { length: 255 }).notNull(),
+      fornecedor: varchar("fornecedor", { length: 255 }),
+      categoria: varchar("categoria", { length: 100 }),
+      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
+      dataVencimento: date("data_vencimento").notNull(),
+      dataPagamento: date("data_pagamento"),
+      formaPagamento: varchar("forma_pagamento", { length: 50 }),
+      status: varchar("status", { length: 50 }).default("pendente"),
+      notas: text("notas"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    dentistas = pgTable("dentistas", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      userId: varchar("user_id", { length: 255 }),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      especialidade: varchar("especialidade", { length: 100 }),
+      numeroOrdem: varchar("numero_ordem", { length: 50 }),
+      telefone: varchar("telefone", { length: 50 }),
+      email: varchar("email", { length: 255 }),
+      ativo: boolean("ativo").default(true),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     historicoUtente = pgTable("historico_utente", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      utenteId: varchar("utente_id", { length: 255 }).notNull(),
-      tipo: varchar("tipo", { length: 50 }).notNull(),
-      descricao: text("descricao").notNull(),
-      data: timestamp("data").notNull(),
-      criadoPor: varchar("criado_por", { length: 64 }).notNull(),
-      criadoEm: timestamp("criado_em").defaultNow()
+      utenteId: varchar("utente_id", { length: 255 }),
+      consultaId: varchar("consulta_id", { length: 255 }),
+      tipo: varchar("tipo", { length: 100 }),
+      descricao: text("descricao"),
+      data: timestamp("data").defaultNow(),
+      criadoPor: varchar("criado_por", { length: 255 }),
+      createdAt: timestamp("created_at").defaultNow()
     });
     procedimentosClinicos = pgTable("procedimentos_clinicos", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      codigo: varchar("codigo", { length: 50 }).notNull().unique(),
+      codigo: varchar("codigo", { length: 50 }),
       nome: varchar("nome", { length: 255 }).notNull(),
       descricao: text("descricao"),
       categoria: varchar("categoria", { length: 100 }),
-      preco: decimal("preco", { precision: 10, scale: 2 }),
+      valorBase: decimal("valor_base", { precision: 10, scale: 2 }),
+      duracaoEstimada: integer("duracao_estimada"),
       ativo: boolean("ativo").default(true),
-      criadoEm: timestamp("criado_em").defaultNow()
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     tabelaPrecos = pgTable("tabela_precos", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      procedimentoId: varchar("procedimento_id", { length: 255 }).notNull(),
+      procedimentoId: varchar("procedimento_id", { length: 255 }),
       nome: varchar("nome", { length: 255 }).notNull(),
       preco: decimal("preco", { precision: 10, scale: 2 }).notNull(),
+      categoria: varchar("categoria", { length: 100 }),
       ativo: boolean("ativo").default(true),
-      criadoEm: timestamp("criado_em").defaultNow()
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
     auditLog = pgTable("audit_log", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      userId: varchar("user_id", { length: 50 }),
-      action: varchar("action", { length: 100 }).notNull(),
-      entity: varchar("entity", { length: 100 }),
-      entityId: varchar("entity_id", { length: 255 }),
-      changes: text("changes"),
+      userId: varchar("user_id", { length: 255 }),
+      acao: varchar("acao", { length: 100 }).notNull(),
+      tabela: varchar("tabela", { length: 100 }),
+      registroId: varchar("registro_id", { length: 255 }),
+      dadosAntigos: text("dados_antigos"),
+      dadosNovos: text("dados_novos"),
       ipAddress: varchar("ip_address", { length: 45 }),
       userAgent: text("user_agent"),
       createdAt: timestamp("created_at").defaultNow()
     });
     notifications = pgTable("notifications", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      userId: varchar("user_id", { length: 50 }).notNull(),
-      type: varchar("type", { length: 50 }).notNull(),
-      title: varchar("title", { length: 255 }).notNull(),
-      message: text("message").notNull(),
-      read: boolean("read").default(false),
+      userId: varchar("user_id", { length: 255 }),
+      tipo: varchar("tipo", { length: 50 }),
+      titulo: varchar("titulo", { length: 255 }),
+      mensagem: text("mensagem"),
+      lida: boolean("lida").default(false),
+      link: varchar("link", { length: 500 }),
       createdAt: timestamp("created_at").defaultNow()
     });
     userPermissions = pgTable("user_permissions", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      userId: varchar("user_id", { length: 50 }).notNull(),
-      permission: varchar("permission", { length: 100 }).notNull(),
-      granted: boolean("granted").default(true),
+      userId: varchar("user_id", { length: 255 }),
+      permissao: varchar("permissao", { length: 100 }).notNull(),
+      ativo: boolean("ativo").default(true),
       createdAt: timestamp("created_at").defaultNow()
     });
     configClinica = pgTable("config_clinica", {
       id: varchar("id", { length: 255 }).primaryKey(),
-      chave: varchar("chave", { length: 100 }).notNull().unique(),
-      valor: text("valor"),
-      tipo: varchar("tipo", { length: 50 }),
-      descricao: text("descricao"),
-      atualizadoEm: timestamp("atualizado_em").defaultNow()
+      nomeClinica: varchar("nome_clinica", { length: 255 }),
+      nif: varchar("nif", { length: 50 }),
+      morada: text("morada"),
+      telefone: varchar("telefone", { length: 50 }),
+      email: varchar("email", { length: 255 }),
+      website: varchar("website", { length: 255 }),
+      logo: text("logo"),
+      horarioFuncionamento: text("horario_funcionamento"),
+      configuracoes: text("configuracoes"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
   }
 });
@@ -796,7 +922,7 @@ async function salvarConfigComissao(dados) {
 async function listarLaboratorios() {
   if (useMockData) return [];
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return [];
     }
@@ -811,7 +937,7 @@ async function listarLaboratorios() {
 async function criarLaboratorio(dados) {
   if (useMockData) return { id: "mock-lab-id", ...dados };
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return { id: "temp-lab-id", ...dados };
     }
@@ -825,7 +951,7 @@ async function criarLaboratorio(dados) {
       observacoes: dados.observacoes || null,
       ativo: dados.ativo !== void 0 ? dados.ativo : true
     };
-    await db.insert(void 0).values(dadosInsert);
+    await db.insert(laboratorios).values(dadosInsert);
     return { id, ...dadosInsert };
   } catch (error) {
     console.error("[DB] Erro ao criar laborat\xF3rio:", error);
@@ -835,11 +961,11 @@ async function criarLaboratorio(dados) {
 async function atualizarLaboratorio(id, dados) {
   if (useMockData) return { id, ...dados };
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return { id, ...dados };
     }
-    await db.update(void 0).set(dados).where(eq((void 0).id, id));
+    await db.update(laboratorios).set(dados).where(eq(laboratorios.id, id));
     return { id, ...dados };
   } catch (error) {
     console.error("[DB] Erro ao atualizar laborat\xF3rio:", error);
@@ -849,11 +975,11 @@ async function atualizarLaboratorio(id, dados) {
 async function removerLaboratorio(id) {
   if (useMockData) return { success: true };
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return { success: true };
     }
-    await db.update(void 0).set({ ativo: false }).where(eq((void 0).id, id));
+    await db.update(laboratorios).set({ ativo: false }).where(eq(laboratorios.id, id));
     return { success: true };
   } catch (error) {
     console.error("[DB] Erro ao remover laborat\xF3rio:", error);
@@ -863,7 +989,7 @@ async function removerLaboratorio(id) {
 async function obterLaboratorio(id) {
   if (useMockData) return null;
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return null;
     }
@@ -878,11 +1004,11 @@ async function obterLaboratorio(id) {
 async function excluirLaboratorio(id) {
   if (useMockData) return { success: true };
   try {
-    if (!void 0) {
+    if (!laboratorios) {
       console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
       return { success: true };
     }
-    await db.update(void 0).set({ ativo: false }).where(eq((void 0).id, id));
+    await db.update(laboratorios).set({ ativo: false }).where(eq(laboratorios.id, id));
     return { success: true };
   } catch (error) {
     console.error("[DB] Erro ao excluir laborat\xF3rio:", error);
@@ -2052,7 +2178,7 @@ var systemRouter = router({
 });
 
 // server/routers.ts
-import { z as z26 } from "zod";
+import { z as z27 } from "zod";
 
 // server/routers/financeiro.ts
 import { z as z2 } from "zod";
@@ -6770,6 +6896,339 @@ var authRouter = router({
   })
 });
 
+// server/routers/consultas.ts
+import { z as z26 } from "zod";
+init_db();
+var consultaSchema = z26.object({
+  utenteId: z26.string().min(1, "ID do utente \xE9 obrigat\xF3rio"),
+  dentistaId: z26.string().optional(),
+  dataHora: z26.string().or(z26.date()),
+  duracao: z26.number().int().positive().default(30),
+  tipo: z26.string().optional(),
+  status: z26.enum(["agendada", "confirmada", "realizada", "cancelada", "faltou"]).default("agendada"),
+  notas: z26.string().optional(),
+  valor: z26.number().optional()
+});
+var atualizarConsultaSchema = z26.object({
+  utenteId: z26.string().optional(),
+  dentistaId: z26.string().optional(),
+  dataHora: z26.string().or(z26.date()).optional(),
+  duracao: z26.number().int().positive().optional(),
+  tipo: z26.string().optional(),
+  status: z26.enum(["agendada", "confirmada", "realizada", "cancelada", "faltou"]).optional(),
+  notas: z26.string().optional(),
+  valor: z26.number().optional()
+});
+var consultasRouter = router({
+  /**
+   * Criar nova consulta
+   */
+  criar: publicProcedure.input(consultaSchema).mutation(async ({ input }) => {
+    try {
+      if (input.dentistaId) {
+        const dataHora = typeof input.dataHora === "string" ? new Date(input.dataHora) : input.dataHora;
+        const conflito = await verificarConflito(
+          input.dentistaId,
+          dataHora,
+          input.duracao
+        );
+        if (conflito) {
+          throw new Error("J\xE1 existe uma consulta agendada neste hor\xE1rio para este dentista");
+        }
+      }
+      const consulta = await criarConsulta(input);
+      return {
+        success: true,
+        data: consulta,
+        message: "Consulta criada com sucesso"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao criar consulta:", error);
+      throw new Error(error.message || "Erro ao criar consulta");
+    }
+  }),
+  /**
+   * Listar todas as consultas
+   */
+  listar: publicProcedure.query(async () => {
+    try {
+      const consultas2 = await listarConsultas();
+      return {
+        success: true,
+        data: consultas2,
+        total: consultas2.length
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao listar consultas:", error);
+      throw new Error("Erro ao listar consultas");
+    }
+  }),
+  /**
+   * Listar consultas por data específica
+   */
+  listarPorData: publicProcedure.input(z26.object({
+    data: z26.string()
+    // formato: YYYY-MM-DD
+  })).query(async ({ input }) => {
+    try {
+      const consultas2 = await listarConsultasPorData(input.data);
+      return {
+        success: true,
+        data: consultas2,
+        total: consultas2.length
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao listar consultas por data:", error);
+      throw new Error("Erro ao listar consultas por data");
+    }
+  }),
+  /**
+   * Listar consultas por médico/dentista
+   */
+  listarPorMedico: publicProcedure.input(z26.object({
+    medicoId: z26.string()
+  })).query(async ({ input }) => {
+    try {
+      const consultas2 = await listarConsultasPorMedico(input.medicoId);
+      return {
+        success: true,
+        data: consultas2,
+        total: consultas2.length
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao listar consultas por m\xE9dico:", error);
+      throw new Error("Erro ao listar consultas por m\xE9dico");
+    }
+  }),
+  /**
+   * Listar consultas por período
+   */
+  listarPorPeriodo: publicProcedure.input(z26.object({
+    dataInicio: z26.string(),
+    // formato: YYYY-MM-DD
+    dataFim: z26.string()
+    // formato: YYYY-MM-DD
+  })).query(async ({ input }) => {
+    try {
+      const consultas2 = await listarConsultasPorPeriodo(
+        input.dataInicio,
+        input.dataFim
+      );
+      return {
+        success: true,
+        data: consultas2,
+        total: consultas2.length
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao listar consultas por per\xEDodo:", error);
+      throw new Error("Erro ao listar consultas por per\xEDodo");
+    }
+  }),
+  /**
+   * Obter consulta por ID
+   */
+  obter: publicProcedure.input(z26.object({
+    id: z26.string()
+  })).query(async ({ input }) => {
+    try {
+      const consulta = await obterConsulta(input.id);
+      if (!consulta) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      return {
+        success: true,
+        data: consulta
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao obter consulta:", error);
+      throw new Error(error.message || "Erro ao obter consulta");
+    }
+  }),
+  /**
+   * Atualizar consulta
+   */
+  atualizar: publicProcedure.input(z26.object({
+    id: z26.string(),
+    dados: atualizarConsultaSchema
+  })).mutation(async ({ input }) => {
+    try {
+      const consultaExistente = await obterConsulta(input.id);
+      if (!consultaExistente) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      if (input.dados.dataHora || input.dados.dentistaId) {
+        const dentistaId = input.dados.dentistaId || consultaExistente.dentistaId;
+        const dataHora = input.dados.dataHora ? typeof input.dados.dataHora === "string" ? new Date(input.dados.dataHora) : input.dados.dataHora : new Date(consultaExistente.dataHora);
+        const duracao = input.dados.duracao || consultaExistente.duracao || 30;
+        if (dentistaId) {
+          const conflito = await verificarConflito(
+            dentistaId,
+            dataHora,
+            duracao
+          );
+          if (conflito) {
+            const consultasConflitantes = await listarConsultasPorMedico(dentistaId);
+            const outroConflito = consultasConflitantes.some(
+              (c) => c.id !== input.id && new Date(c.dataHora).getTime() === dataHora.getTime()
+            );
+            if (outroConflito) {
+              throw new Error("J\xE1 existe outra consulta agendada neste hor\xE1rio para este dentista");
+            }
+          }
+        }
+      }
+      const consulta = await atualizarConsulta(input.id, input.dados);
+      return {
+        success: true,
+        data: consulta,
+        message: "Consulta atualizada com sucesso"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao atualizar consulta:", error);
+      throw new Error(error.message || "Erro ao atualizar consulta");
+    }
+  }),
+  /**
+   * Remover consulta
+   */
+  remover: publicProcedure.input(z26.object({
+    id: z26.string()
+  })).mutation(async ({ input }) => {
+    try {
+      const consultaExistente = await obterConsulta(input.id);
+      if (!consultaExistente) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      await removerConsulta(input.id);
+      return {
+        success: true,
+        message: "Consulta removida com sucesso"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao remover consulta:", error);
+      throw new Error(error.message || "Erro ao remover consulta");
+    }
+  }),
+  /**
+   * Cancelar consulta (soft delete)
+   */
+  cancelar: publicProcedure.input(z26.object({
+    id: z26.string(),
+    motivo: z26.string().optional()
+  })).mutation(async ({ input }) => {
+    try {
+      const consultaExistente = await obterConsulta(input.id);
+      if (!consultaExistente) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      const notas = input.motivo ? `${consultaExistente.notas || ""}
+[CANCELADA] ${input.motivo}`.trim() : consultaExistente.notas;
+      await atualizarConsulta(input.id, {
+        status: "cancelada",
+        notas
+      });
+      return {
+        success: true,
+        message: "Consulta cancelada com sucesso"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao cancelar consulta:", error);
+      throw new Error(error.message || "Erro ao cancelar consulta");
+    }
+  }),
+  /**
+   * Confirmar consulta
+   */
+  confirmar: publicProcedure.input(z26.object({
+    id: z26.string()
+  })).mutation(async ({ input }) => {
+    try {
+      const consultaExistente = await obterConsulta(input.id);
+      if (!consultaExistente) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      await atualizarConsulta(input.id, {
+        status: "confirmada"
+      });
+      return {
+        success: true,
+        message: "Consulta confirmada com sucesso"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao confirmar consulta:", error);
+      throw new Error(error.message || "Erro ao confirmar consulta");
+    }
+  }),
+  /**
+   * Marcar consulta como realizada
+   */
+  marcarRealizada: publicProcedure.input(z26.object({
+    id: z26.string(),
+    notas: z26.string().optional()
+  })).mutation(async ({ input }) => {
+    try {
+      const consultaExistente = await obterConsulta(input.id);
+      if (!consultaExistente) {
+        throw new Error("Consulta n\xE3o encontrada");
+      }
+      const dados = {
+        status: "realizada"
+      };
+      if (input.notas) {
+        dados.notas = input.notas;
+      }
+      await atualizarConsulta(input.id, dados);
+      return {
+        success: true,
+        message: "Consulta marcada como realizada"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao marcar consulta como realizada:", error);
+      throw new Error(error.message || "Erro ao marcar consulta como realizada");
+    }
+  }),
+  /**
+   * Verificar conflito de horário
+   */
+  verificarConflito: publicProcedure.input(z26.object({
+    dentistaId: z26.string(),
+    dataHora: z26.string().or(z26.date()),
+    duracao: z26.number().int().positive().default(30)
+  })).query(async ({ input }) => {
+    try {
+      const dataHora = typeof input.dataHora === "string" ? new Date(input.dataHora) : input.dataHora;
+      const conflito = await verificarConflito(
+        input.dentistaId,
+        dataHora,
+        input.duracao
+      );
+      return {
+        success: true,
+        conflito,
+        message: conflito ? "Existe conflito de hor\xE1rio" : "Hor\xE1rio dispon\xEDvel"
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao verificar conflito:", error);
+      throw new Error("Erro ao verificar conflito");
+    }
+  }),
+  /**
+   * Obter estatísticas de consultas
+   */
+  estatisticas: publicProcedure.query(async () => {
+    try {
+      const stats = await obterEstatisticasConsultas();
+      return {
+        success: true,
+        data: stats
+      };
+    } catch (error) {
+      console.error("[Router] Erro ao obter estat\xEDsticas:", error);
+      throw new Error("Erro ao obter estat\xEDsticas");
+    }
+  })
+});
+
 // server/routers.ts
 var appRouter = router({
   system: systemRouter,
@@ -6796,46 +7255,46 @@ var appRouter = router({
       return await listarUtentes2();
     }),
     // Obter utente por ID
-    obter: protectedProcedure.input(z26.object({ id: z26.string() })).query(async ({ input }) => {
+    obter: protectedProcedure.input(z27.object({ id: z27.string() })).query(async ({ input }) => {
       const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       return await obterUtente2(input.id);
     }),
     // Pesquisar utentes
-    pesquisar: protectedProcedure.input(z26.object({ termo: z26.string() })).query(async ({ input }) => {
+    pesquisar: protectedProcedure.input(z27.object({ termo: z27.string() })).query(async ({ input }) => {
       const { pesquisarUtentes: pesquisarUtentes2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       return await pesquisarUtentes2(input.termo);
     }),
     // Criar novo utente
     criar: protectedProcedure.input(
-      z26.object({
-        nomeCompleto: z26.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
-        dataNascimento: z26.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida (use YYYY-MM-DD)"),
-        genero: z26.enum(["M", "F", "Outro"]),
-        nif: z26.string().length(9, "NIF deve ter 9 d\xEDgitos").optional(),
-        numUtenteSns: z26.string().length(9).optional(),
-        fotoPerfil: z26.string().optional(),
-        contacto: z26.object({
-          telemovel: z26.string().min(1, "Telem\xF3vel/WhatsApp \xE9 obrigat\xF3rio"),
-          telefone: z26.string().optional(),
-          email: z26.string().email("Email inv\xE1lido").optional(),
-          telefoneEmergencia: z26.string().optional()
+      z27.object({
+        nomeCompleto: z27.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
+        dataNascimento: z27.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida (use YYYY-MM-DD)"),
+        genero: z27.enum(["M", "F", "Outro"]),
+        nif: z27.string().length(9, "NIF deve ter 9 d\xEDgitos").optional(),
+        numUtenteSns: z27.string().length(9).optional(),
+        fotoPerfil: z27.string().optional(),
+        contacto: z27.object({
+          telemovel: z27.string().min(1, "Telem\xF3vel/WhatsApp \xE9 obrigat\xF3rio"),
+          telefone: z27.string().optional(),
+          email: z27.string().email("Email inv\xE1lido").optional(),
+          telefoneEmergencia: z27.string().optional()
         }),
-        morada: z26.object({
-          rua: z26.string().optional(),
-          numero: z26.string().optional(),
-          codigoPostal: z26.string().regex(/^\d{4}-\d{3}$/, "C\xF3digo postal inv\xE1lido").optional(),
-          localidade: z26.string().optional(),
-          distrito: z26.string().optional()
+        morada: z27.object({
+          rua: z27.string().optional(),
+          numero: z27.string().optional(),
+          codigoPostal: z27.string().regex(/^\d{4}-\d{3}$/, "C\xF3digo postal inv\xE1lido").optional(),
+          localidade: z27.string().optional(),
+          distrito: z27.string().optional()
         }).optional(),
-        infoMedica: z26.object({
-          alergias: z26.array(z26.string()),
-          medicamentos: z26.array(z26.string()),
-          condicoesMedicas: z26.array(z26.string()),
-          classificacaoAsa: z26.enum(["I", "II", "III", "IV", "V", "VI"]),
-          grupoSanguineo: z26.string().optional(),
-          notasImportantes: z26.string().optional()
+        infoMedica: z27.object({
+          alergias: z27.array(z27.string()),
+          medicamentos: z27.array(z27.string()),
+          condicoesMedicas: z27.array(z27.string()),
+          classificacaoAsa: z27.enum(["I", "II", "III", "IV", "V", "VI"]),
+          grupoSanguineo: z27.string().optional(),
+          notasImportantes: z27.string().optional()
         }),
-        tags: z26.array(z26.string()).optional()
+        tags: z27.array(z27.string()).optional()
       })
     ).mutation(async ({ input, ctx }) => {
       const { criarUtente: criarUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -6847,38 +7306,38 @@ var appRouter = router({
     }),
     // Atualizar utente
     atualizar: protectedProcedure.input(
-      z26.object({
-        id: z26.string(),
-        dados: z26.object({
-          nomeCompleto: z26.string().min(3).optional(),
-          dataNascimento: z26.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-          genero: z26.enum(["M", "F", "Outro"]).optional(),
-          nif: z26.string().length(9).optional(),
-          numUtenteSns: z26.string().length(9).optional(),
-          fotoPerfil: z26.string().optional(),
-          contacto: z26.object({
-            telemovel: z26.string().min(1, "Telem\xF3vel/WhatsApp \xE9 obrigat\xF3rio"),
-            telefone: z26.string().optional(),
-            email: z26.string().email().optional(),
-            telefoneEmergencia: z26.string().optional()
+      z27.object({
+        id: z27.string(),
+        dados: z27.object({
+          nomeCompleto: z27.string().min(3).optional(),
+          dataNascimento: z27.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          genero: z27.enum(["M", "F", "Outro"]).optional(),
+          nif: z27.string().length(9).optional(),
+          numUtenteSns: z27.string().length(9).optional(),
+          fotoPerfil: z27.string().optional(),
+          contacto: z27.object({
+            telemovel: z27.string().min(1, "Telem\xF3vel/WhatsApp \xE9 obrigat\xF3rio"),
+            telefone: z27.string().optional(),
+            email: z27.string().email().optional(),
+            telefoneEmergencia: z27.string().optional()
           }).optional(),
-          morada: z26.object({
-            rua: z26.string(),
-            numero: z26.string(),
-            codigoPostal: z26.string().regex(/^\d{4}-\d{3}$/),
-            localidade: z26.string(),
-            distrito: z26.string()
+          morada: z27.object({
+            rua: z27.string(),
+            numero: z27.string(),
+            codigoPostal: z27.string().regex(/^\d{4}-\d{3}$/),
+            localidade: z27.string(),
+            distrito: z27.string()
           }).optional(),
-          infoMedica: z26.object({
-            alergias: z26.array(z26.string()),
-            medicamentos: z26.array(z26.string()),
-            condicoesMedicas: z26.array(z26.string()),
-            classificacaoAsa: z26.enum(["I", "II", "III", "IV", "V", "VI"]),
-            grupoSanguineo: z26.string().optional(),
-            notasImportantes: z26.string().optional()
+          infoMedica: z27.object({
+            alergias: z27.array(z27.string()),
+            medicamentos: z27.array(z27.string()),
+            condicoesMedicas: z27.array(z27.string()),
+            classificacaoAsa: z27.enum(["I", "II", "III", "IV", "V", "VI"]),
+            grupoSanguineo: z27.string().optional(),
+            notasImportantes: z27.string().optional()
           }).optional(),
-          status: z26.enum(["ativo", "inativo", "arquivado"]).optional(),
-          tags: z26.array(z26.string()).optional()
+          status: z27.enum(["ativo", "inativo", "arquivado"]).optional(),
+          tags: z27.array(z27.string()).optional()
         })
       })
     ).mutation(async ({ input }) => {
@@ -6891,7 +7350,7 @@ var appRouter = router({
       return await atualizarUtente2(input.id, dados);
     }),
     // Remover utente (soft delete)
-    remover: protectedProcedure.input(z26.object({ id: z26.string() })).mutation(async ({ input }) => {
+    remover: protectedProcedure.input(z27.object({ id: z27.string() })).mutation(async ({ input }) => {
       const { removerUtente: removerUtente3 } = await Promise.resolve().then(() => (init_db(), db_exports));
       await removerUtente3(input.id);
       return { sucesso: true };
@@ -6908,9 +7367,9 @@ var appRouter = router({
   ia: router({
     // Assistente de Diagnóstico
     analisarSintomas: protectedProcedure.input(
-      z26.object({
-        utenteId: z26.string(),
-        sintomas: z26.string()
+      z27.object({
+        utenteId: z27.string(),
+        sintomas: z27.string()
       })
     ).mutation(async ({ input }) => {
       const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -6930,10 +7389,10 @@ var appRouter = router({
     }),
     // Verificação de Medicamento
     verificarMedicamento: protectedProcedure.input(
-      z26.object({
-        utenteId: z26.string(),
-        medicamento: z26.string(),
-        dosagem: z26.string()
+      z27.object({
+        utenteId: z27.string(),
+        medicamento: z27.string(),
+        dosagem: z27.string()
       })
     ).mutation(async ({ input }) => {
       const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -6953,17 +7412,17 @@ var appRouter = router({
     }),
     // Gerar Resumo de Consulta
     gerarResumo: protectedProcedure.input(
-      z26.object({
-        notasConsulta: z26.string(),
-        tratamentosRealizados: z26.array(z26.string()).optional(),
-        proximaConsulta: z26.string().optional()
+      z27.object({
+        notasConsulta: z27.string(),
+        tratamentosRealizados: z27.array(z27.string()).optional(),
+        proximaConsulta: z27.string().optional()
       })
     ).mutation(async ({ input }) => {
       const { gerarResumoConsulta: gerarResumoConsulta2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
       return await gerarResumoConsulta2(input);
     }),
     // Análise de Risco
-    analisarRisco: protectedProcedure.input(z26.object({ utenteId: z26.string() })).mutation(async ({ input }) => {
+    analisarRisco: protectedProcedure.input(z27.object({ utenteId: z27.string() })).mutation(async ({ input }) => {
       const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { analisarRiscoPaciente: analisarRiscoPaciente2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
       const utente = await obterUtente2(input.utenteId);
@@ -6978,9 +7437,9 @@ var appRouter = router({
     }),
     // Assistente Virtual
     assistente: protectedProcedure.input(
-      z26.object({
-        utenteId: z26.string(),
-        pergunta: z26.string()
+      z27.object({
+        utenteId: z27.string(),
+        pergunta: z27.string()
       })
     ).mutation(async ({ input }) => {
       const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
@@ -7003,10 +7462,10 @@ var appRouter = router({
     }),
     // Análise de Imagem com IA
     analisarImagem: protectedProcedure.input(
-      z26.object({
-        imagemBase64: z26.string(),
-        tipoImagem: z26.string(),
-        contexto: z26.string().optional()
+      z27.object({
+        imagemBase64: z27.string(),
+        tipoImagem: z27.string(),
+        contexto: z27.string().optional()
       })
     ).mutation(async ({ input }) => {
       try {
@@ -7034,129 +7493,8 @@ var appRouter = router({
   // ========================================
   // imagens: imagensRouter,
   // ========================================
-  // CONSULTAS
+  // CONSULTAS (removido inline - agora usa router importado)
   // ========================================
-  consultas: router({
-    // Listar todas as consultas
-    listar: protectedProcedure.query(async () => {
-      const { listarConsultas: listarConsultas2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultas2();
-    }),
-    // Obter consulta por ID
-    obter: protectedProcedure.input(z26.object({ id: z26.string() })).query(async ({ input }) => {
-      const { obterConsulta: obterConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterConsulta2(input.id);
-    }),
-    // Criar nova consulta
-    criar: protectedProcedure.input(
-      z26.object({
-        utenteId: z26.string(),
-        medicoId: z26.string().optional().nullable(),
-        dataHora: z26.string(),
-        duracao: z26.number().optional(),
-        tipoConsulta: z26.string().optional().nullable(),
-        procedimento: z26.string().optional().nullable(),
-        status: z26.enum(["agendada", "confirmada", "realizada", "cancelada", "faltou", "em_atendimento"]).optional(),
-        observacoes: z26.string().optional().nullable(),
-        valorEstimado: z26.number().optional().nullable(),
-        classificacaoRisco: z26.string().optional().nullable()
-      })
-    ).mutation(async ({ input }) => {
-      const { criarConsulta: criarConsulta2, verificarConflito: verificarConflito2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      if (input.medicoId) {
-        const temConflito = await verificarConflito2(
-          input.medicoId,
-          input.dataHora,
-          input.duracao || 30
-        );
-        if (temConflito) {
-          throw new Error("J\xE1 existe uma consulta agendada para este m\xE9dico neste hor\xE1rio");
-        }
-      }
-      return await criarConsulta2(input);
-    }),
-    // Atualizar consulta
-    atualizar: protectedProcedure.input(
-      z26.object({
-        id: z26.string(),
-        utenteId: z26.string().optional(),
-        medicoId: z26.string().optional().nullable(),
-        dataHora: z26.string().optional(),
-        duracao: z26.number().optional(),
-        tipoConsulta: z26.string().optional().nullable(),
-        procedimento: z26.string().optional().nullable(),
-        status: z26.enum(["agendada", "confirmada", "realizada", "cancelada", "faltou", "em_atendimento"]).optional(),
-        observacoes: z26.string().optional().nullable(),
-        valorEstimado: z26.number().optional().nullable(),
-        classificacaoRisco: z26.string().optional().nullable()
-      })
-    ).mutation(async ({ input }) => {
-      const { atualizarConsulta: atualizarConsulta2, verificarConflito: verificarConflito2, obterConsulta: obterConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      if (input.medicoId || input.dataHora || input.duracao) {
-        const consultaAtual = await obterConsulta2(input.id);
-        const medicoId = input.medicoId !== void 0 ? input.medicoId : consultaAtual.medicoId;
-        const dataHora = input.dataHora || consultaAtual.dataHora;
-        const duracao = input.duracao || consultaAtual.duracao;
-        if (medicoId) {
-          const temConflito = await verificarConflito2(
-            medicoId,
-            dataHora,
-            duracao,
-            input.id
-          );
-          if (temConflito) {
-            throw new Error("J\xE1 existe uma consulta agendada para este m\xE9dico neste hor\xE1rio");
-          }
-        }
-      }
-      const { id, ...dados } = input;
-      return await atualizarConsulta2(id, dados);
-    }),
-    // Remover consulta
-    remover: protectedProcedure.input(z26.object({ id: z26.string() })).mutation(async ({ input }) => {
-      const { removerConsulta: removerConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      await removerConsulta2(input.id);
-      return { success: true };
-    }),
-    // Listar consultas por data
-    listarPorData: protectedProcedure.input(z26.object({ data: z26.string() })).query(async ({ input }) => {
-      const { listarConsultasPorData: listarConsultasPorData2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorData2(input.data);
-    }),
-    // Listar consultas por período
-    listarPorPeriodo: protectedProcedure.input(z26.object({
-      dataInicio: z26.string(),
-      dataFim: z26.string()
-    })).query(async ({ input }) => {
-      const { listarConsultasPorPeriodo: listarConsultasPorPeriodo2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorPeriodo2(input.dataInicio, input.dataFim);
-    }),
-    // Listar consultas por médico
-    listarPorMedico: protectedProcedure.input(z26.object({ medicoId: z26.string() })).query(async ({ input }) => {
-      const { listarConsultasPorMedico: listarConsultasPorMedico2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorMedico2(input.medicoId);
-    }),
-    // Verificar conflito de horário
-    verificarConflito: protectedProcedure.input(z26.object({
-      medicoId: z26.string(),
-      dataHora: z26.string(),
-      duracao: z26.number(),
-      consultaIdExcluir: z26.string().optional()
-    })).query(async ({ input }) => {
-      const { verificarConflito: verificarConflito2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await verificarConflito2(
-        input.medicoId,
-        input.dataHora,
-        input.duracao,
-        input.consultaIdExcluir
-      );
-    }),
-    // Obter estatísticas
-    estatisticas: protectedProcedure.query(async () => {
-      const { obterEstatisticasConsultas: obterEstatisticasConsultas2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterEstatisticasConsultas2();
-    })
-  }),
   // ========================================
   // FINANCEIRO / FATURAÇÃO
   // ========================================
@@ -7253,7 +7591,11 @@ var appRouter = router({
   // ESTOQUE/INVENTÁRIO
   // ========================================
   estoque: estoqueRouter,
-  integracao: integracaoRouter
+  integracao: integracaoRouter,
+  // ========================================
+  // CONSULTAS/AGENDAMENTO
+  // ========================================
+  consultas: consultasRouter
 });
 
 // server/_core/context.ts
