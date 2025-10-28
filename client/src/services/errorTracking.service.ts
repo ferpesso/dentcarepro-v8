@@ -38,6 +38,7 @@ class ErrorTrackingService {
   private maxErrors = 100; // Máximo de erros armazenados
   private listeners: Set<(errors: ErrorLog[]) => void> = new Set();
   private isInitialized = false;
+  private isLogging = false; // Proteção contra loops infinitos
 
   /**
    * Inicializar o serviço de error tracking
@@ -72,7 +73,8 @@ class ErrorTrackingService {
    * Capturar erro global de JavaScript
    */
   private handleGlobalError(event: ErrorEvent) {
-    event.preventDefault(); // Prevenir log padrão do console
+    // NÃO prevenir o comportamento padrão para evitar bloquear erros legítimos
+    // event.preventDefault();
 
     this.logError({
       type: this.detectErrorType(event.message),
@@ -91,7 +93,8 @@ class ErrorTrackingService {
    * Capturar promessas rejeitadas não tratadas
    */
   private handleUnhandledRejection(event: PromiseRejectionEvent) {
-    event.preventDefault();
+    // NÃO prevenir o comportamento padrão
+    // event.preventDefault();
 
     const reason = event.reason;
     const message =
@@ -215,37 +218,51 @@ class ErrorTrackingService {
     severity: ErrorSeverity;
     context?: Record<string, any>;
   }) {
-    const errorLog: ErrorLog = {
-      id: this.generateId(),
-      timestamp: new Date(),
-      type: params.type,
-      message: params.message,
-      stack: params.stack,
-      componentStack: params.componentStack,
-      url: window.location.href,
-      userAgent: navigator.userAgent,
-      user: this.getCurrentUser(),
-      context: params.context,
-      severity: params.severity,
-    };
-
-    // Adicionar ao início do array
-    this.errors.unshift(errorLog);
-
-    // Limitar número de erros
-    if (this.errors.length > this.maxErrors) {
-      this.errors = this.errors.slice(0, this.maxErrors);
+    // Proteção contra loops infinitos
+    if (this.isLogging) {
+      console.warn('[ErrorTracking] Loop detectado, ignorando erro');
+      return;
     }
 
-    // Salvar no localStorage
-    this.saveToStorage();
+    this.isLogging = true;
 
-    // Notificar listeners
-    this.notifyListeners();
+    try {
+      const errorLog: ErrorLog = {
+        id: this.generateId(),
+        timestamp: new Date(),
+        type: params.type,
+        message: params.message,
+        stack: params.stack,
+        componentStack: params.componentStack,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        user: this.getCurrentUser(),
+        context: params.context,
+        severity: params.severity,
+      };
 
-    // Log no console (apenas em desenvolvimento)
-    if (import.meta.env.DEV) {
-      console.error('[ErrorTracking]', errorLog);
+      // Adicionar ao início do array
+      this.errors.unshift(errorLog);
+
+      // Limitar número de erros
+      if (this.errors.length > this.maxErrors) {
+        this.errors = this.errors.slice(0, this.maxErrors);
+      }
+
+      // Salvar no localStorage
+      this.saveToStorage();
+
+      // Notificar listeners
+      this.notifyListeners();
+
+      // Log no console (apenas em desenvolvimento)
+      if (import.meta.env.DEV) {
+        console.error('[ErrorTracking]', errorLog);
+      }
+    } catch (e) {
+      console.error('[ErrorTracking] Erro ao registrar erro:', e);
+    } finally {
+      this.isLogging = false;
     }
   }
 

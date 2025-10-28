@@ -83,6 +83,7 @@ export const tratamentosRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { criarTratamento } = await import("../db");
+      if (!ctx.user) throw new Error('Usuário não autenticado');
       return await criarTratamento({
         ...input,
         criadoPor: ctx.user.id,
@@ -114,6 +115,7 @@ export const tratamentosRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { atualizarTratamento } = await import("../db");
+      if (!ctx.user) throw new Error('Usuário não autenticado');
       const tratamento = await atualizarTratamento(input.id, {
         ...input.dados,
         atualizadoPor: ctx.user.id,

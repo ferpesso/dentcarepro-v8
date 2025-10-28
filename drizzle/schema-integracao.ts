@@ -132,7 +132,7 @@ export const tabelaPrecos = mysqlTable("tabela_precos", {
 });
 
 export type TabelaPreco = typeof tabelaPrecos.$inferSelect;
-export type InsertTabelaPreco = typeof tabelaPrecos.$inferInsert();
+export type InsertTabelaPreco = typeof tabelaPrecos.$inferInsert;
 
 // ========================================
 // FATURAS (Extensão)

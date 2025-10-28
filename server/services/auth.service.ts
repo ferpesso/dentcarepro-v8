@@ -100,7 +100,13 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
-    return payload as JWTPayload;
+    
+    // Verificar se o payload tem os campos necessários
+    if (!payload.userId || !payload.email || !payload.role || !payload.sessionId) {
+      return null;
+    }
+    
+    return payload as unknown as JWTPayload;
   } catch (error) {
     console.error('Token verification failed:', error);
     return null;

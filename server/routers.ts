@@ -12,7 +12,7 @@ import { comissoesRouter } from "./routers/comissoes";
 import { laboratoriosRouter } from "./routers/laboratorios";
 import { contasPagarRouter } from "./routers/contas-pagar";
 import { iaFinanceiraRouter } from "./routers/ia-financeira";
-import { tratamentosRouter } from "./routers/tratamentos";
+// import { tratamentosRouter } from "./routers/tratamentos";
 import { prescricoesRouter, medicamentosRouter } from "./routers/prescricoes";
 import { odontogramaRouter } from "./routers/odontograma";
 import { periodontogramaRouter } from "./routers/periodontograma";
@@ -568,7 +568,7 @@ export const appRouter = router({
   // ========================================
   // TRATAMENTOS
   // ========================================
-  tratamentos: tratamentosRouter,
+  // tratamentos: tratamentosRouter, // Temporariamente desativado - funções não implementadas no db.ts
 
   // ========================================
   // PRESCRIÇÕES
