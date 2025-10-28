@@ -4,7 +4,9 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider, ProtectedRoute } from "./contexts/AuthContext";
 import Home from "./pages/Home";
+import Login from "./pages/Login";
 import Utentes from "./pages/Utentes";
 import UtenteDetail from "./pages/UtenteDetail";
 import AgendaAvancadaV2 from "./pages/AgendaAvancadaV2";
@@ -16,23 +18,33 @@ import ContasPagar from "./pages/ContasPagar";
 import IAFinanceira from "./pages/IAFinanceira";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/utentes"} component={Utentes} />
-      <Route path={"/utentes/:id"} component={UtenteDetail} />
-      <Route path={"/agenda"} component={AgendaAvancadaV2} />
-      <Route path={"/consultas"} component={AgendaAvancadaV2} />
-      <Route path={"/faturacao"} component={Faturacao} />
-      <Route path={"/ajustes"} component={Ajustes} />
-      <Route path={"/dentistas/:id/comissoes"} component={DentistaComissoes} />
-      <Route path={"/laboratorios"} component={Laboratorios} />
-      <Route path={"/contas-pagar"} component={ContasPagar} />
-      <Route path={"/ia-financeira"} component={IAFinanceira} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
+      {/* Rota pública de login */}
+      <Route path={"/login"} component={Login} />
+      
+      {/* Rotas protegidas */}
+      <Route path={"/:rest*"}>
+        {(params) => (
+          <ProtectedRoute>
+            <Switch>
+              <Route path={"/"} component={Home} />
+              <Route path={"/utentes"} component={Utentes} />
+              <Route path={"/utentes/:id"} component={UtenteDetail} />
+              <Route path={"/agenda"} component={AgendaAvancadaV2} />
+              <Route path={"/consultas"} component={AgendaAvancadaV2} />
+              <Route path={"/faturacao"} component={Faturacao} />
+              <Route path={"/ajustes"} component={Ajustes} />
+              <Route path={"/dentistas/:id/comissoes"} component={DentistaComissoes} />
+              <Route path={"/laboratorios"} component={Laboratorios} />
+              <Route path={"/contas-pagar"} component={ContasPagar} />
+              <Route path={"/ia-financeira"} component={IAFinanceira} />
+              <Route path={"/404"} component={NotFound} />
+              <Route component={NotFound} />
+            </Switch>
+          </ProtectedRoute>
+        )}
+      </Route>
     </Switch>
   );
 }
@@ -49,10 +61,12 @@ function App() {
         defaultTheme="light"
         // switchable
       >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

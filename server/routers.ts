@@ -29,11 +29,16 @@ import { anamneseRouter } from "./routers/anamnese";
 import { lembretesRouter } from "./routers/lembretes";
 import { estoqueRouter } from "./routers/estoque";
 import { integracaoRouter } from "./routers/integracao";
+import { authRouter } from "./routers/auth";
 
 export const appRouter = router({
   system: systemRouter,
 
-  auth: router({
+  // Sistema de Autenticação Completo
+  auth: authRouter,
+
+  // Auth legado (manter para compatibilidade)
+  authLegacy: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
