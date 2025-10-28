@@ -1,3 +1,4 @@
+// Build: Force rebuild with authentication system - 1761660302
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
