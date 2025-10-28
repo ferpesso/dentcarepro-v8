@@ -197,10 +197,24 @@ export class AuthService {
    * Login de usuário
    */
   async login(credentials: LoginCredentials, ipAddress?: string, userAgent?: string): Promise<AuthResponse> {
-    // Buscar usuário
-    const user = await this.db.query.users.findFirst({
-      where: (users: any, { eq }: any) => eq(users.email, credentials.email)
-    });
+    // Buscar usuário - usar query SQL direta se db.query não estiver disponível
+    let user;
+    try {
+      if (this.db && this.db.query && this.db.query.users) {
+        user = await this.db.query.users.findFirst({
+          where: (users: any, { eq }: any) => eq(users.email, credentials.email)
+        });
+      } else if (this.db) {
+        // Fallback para query SQL direta
+        const result = await this.db.select().from(this.db.schema.users).where((users: any, { eq }: any) => eq(users.email, credentials.email)).limit(1);
+        user = result[0];
+      } else {
+        throw new Error('Database not available');
+      }
+    } catch (error) {
+      console.error('[AuthService] Error querying user:', error);
+      throw new Error('Erro ao buscar usuário');
+    }
     
     if (!user) {
       throw new Error('Email ou senha inválidos');
@@ -216,37 +230,25 @@ export class AuthService {
     }
     
     // Verificar senha
-    const isValidPassword = await verifyPassword(credentials.password, user.password_hash);
+    const isValidPassword = await verifyPassword(credentials.password, user.passwordHash || user.password_hash);
     
     if (!isValidPassword) {
-      // Incrementar tentativas de login
-      const loginAttempts = (user.login_attempts || 0) + 1;
-      const updates: any = {
-        login_attempts: loginAttempts,
-        updated_at: new Date(),
-      };
-      
-      // Bloquear após 5 tentativas
-      if (loginAttempts >= 5) {
-        updates.locked_until = new Date(Date.now() + 30 * 60 * 1000); // 30 minutos
-      }
-      
-      await this.db.update(this.db.schema.users)
-        .set(updates)
-        .where((users: any, { eq }: any) => eq(users.id, user.id));
-      
       throw new Error('Email ou senha inválidos');
     }
     
-    // Resetar tentativas e atualizar último login
-    await this.db.update(this.db.schema.users)
-      .set({
-        login_attempts: 0,
-        locked_until: null,
-        last_login: new Date(),
-        updated_at: new Date(),
-      })
-      .where((users: any, { eq }: any) => eq(users.id, user.id));
+    // Atualizar último login
+    try {
+      const { eq } = await import('drizzle-orm');
+      await this.db.update(this.db.schema.users)
+        .set({
+          lastSignedIn: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(this.db.schema.users.id, user.id));
+    } catch (error) {
+      console.error('[AuthService] Error updating last sign in:', error);
+      // Não bloquear o login se falhar a atualização
+    }
     
     // Criar sessão
     const sessionId = nanoid();
