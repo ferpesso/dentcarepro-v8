@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { publicProcedure, router } from '../_core/trpc';
-import { AuthService } from '../services/auth.service';
+import { AuthServiceSimple } from '../services/auth-simple.service';
 import { TRPCError } from '@trpc/server';
 
 // ========================================
@@ -57,13 +57,11 @@ export const authRouter = router({
     .input(loginSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const authService = new AuthService(ctx.db);
-        
         // Extrair IP e User Agent do contexto (se disponível)
         const ipAddress = ctx.req?.ip || ctx.req?.socket?.remoteAddress;
         const userAgent = ctx.req?.headers?.['user-agent'];
         
-        const result = await authService.login(input, ipAddress, userAgent);
+        const result = await AuthServiceSimple.login(input, ipAddress, userAgent);
         
         return {
           success: true,
@@ -84,8 +82,7 @@ export const authRouter = router({
     .input(registerSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const authService = new AuthService(ctx.db);
-        const result = await authService.register(input);
+        const result = await AuthServiceSimple.register(input);
         
         return {
           success: true,

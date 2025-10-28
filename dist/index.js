@@ -11,601 +11,189 @@ var __export = (target, all) => {
 // drizzle/schema.ts
 var schema_exports = {};
 __export(schema_exports, {
-  cadastroLaboratorios: () => cadastroLaboratorios,
-  categoriasDespesa: () => categoriasDespesa,
+  auditLog: () => auditLog,
   comissoes: () => comissoes,
   configClinica: () => configClinica,
   configComissoes: () => configComissoes,
   consultas: () => consultas,
-  contasPagar: () => contasPagar,
-  contasReceber: () => contasReceber,
   dentistas: () => dentistas,
-  endodontia: () => endodontia,
-  formasPagamento: () => formasPagamento,
-  fornecedores: () => fornecedores,
-  funcionarios: () => funcionarios,
-  imagens: () => imagens,
-  implantes: () => implantes,
-  laboratorio: () => laboratorio,
-  movimentosCaixa: () => movimentosCaixa,
-  odontograma: () => odontograma,
-  ortodontia: () => ortodontia,
-  ortodontiaConsultas: () => ortodontiaConsultas,
-  pagamentosContasPagar: () => pagamentosContasPagar,
-  pagamentosContasReceber: () => pagamentosContasReceber,
-  periodontograma: () => periodontograma,
-  prescricoes: () => prescricoes,
-  trabalhosLaboratorio: () => trabalhosLaboratorio,
+  faturas: () => faturas,
+  historicoUtente: () => historicoUtente,
+  notifications: () => notifications,
+  procedimentosClinicos: () => procedimentosClinicos,
+  tabelaPrecos: () => tabelaPrecos,
+  userPermissions: () => userPermissions,
+  userSessions: () => userSessions,
   users: () => users,
   utentes: () => utentes
 });
-import { mysqlTable, varchar, text, timestamp, mysqlEnum, int, decimal, datetime, boolean } from "drizzle-orm/mysql-core";
-var users, utentes, consultas, imagens, odontograma, endodontia, implantes, laboratorio, ortodontia, ortodontiaConsultas, periodontograma, prescricoes, dentistas, comissoes, configComissoes, configClinica, formasPagamento, funcionarios, cadastroLaboratorios, trabalhosLaboratorio, categoriasDespesa, fornecedores, contasPagar, pagamentosContasPagar, contasReceber, pagamentosContasReceber, movimentosCaixa;
+import { pgTable, varchar, text, timestamp, integer, decimal, boolean } from "drizzle-orm/pg-core";
+var users, userSessions, utentes, consultas, faturas, dentistas, comissoes, configComissoes, historicoUtente, procedimentosClinicos, tabelaPrecos, auditLog, notifications, userPermissions, configClinica;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
-    users = mysqlTable("users", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      name: text("name"),
-      email: varchar("email", { length: 320 }),
-      loginMethod: varchar("loginMethod", { length: 64 }),
-      role: mysqlEnum("role", ["user", "admin"]).notNull().default("user"),
-      createdAt: timestamp("createdAt").defaultNow(),
-      lastSignedIn: timestamp("lastSignedIn").defaultNow()
+    users = pgTable("users", {
+      id: varchar("id", { length: 50 }).primaryKey(),
+      name: varchar("name", { length: 255 }).notNull(),
+      email: varchar("email", { length: 255 }).notNull(),
+      loginMethod: varchar("login_method", { length: 50 }),
+      role: varchar("role", { length: 50 }).default("user"),
+      lastSignedIn: timestamp("last_signed_in"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow(),
+      passwordHash: varchar("password_hash", { length: 255 }),
+      status: varchar("status", { length: 20 }).default("ativo"),
+      dentistaId: varchar("dentista_id", { length: 64 }),
+      resetToken: varchar("reset_token", { length: 255 }),
+      resetTokenExpires: timestamp("reset_token_expires"),
+      emailVerified: integer("email_verified").default(0)
     });
-    utentes = mysqlTable("utentes", {
+    userSessions = pgTable("user_sessions", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      userId: varchar("user_id", { length: 50 }).notNull(),
+      token: text("token").notNull(),
+      expiresAt: timestamp("expires_at").notNull(),
+      createdAt: timestamp("created_at").defaultNow(),
+      ipAddress: varchar("ip_address", { length: 45 }),
+      userAgent: text("user_agent")
+    });
+    utentes = pgTable("utentes", {
       id: varchar("id", { length: 36 }).primaryKey(),
-      numeroUtente: varchar("numeroUtente", { length: 20 }).notNull().unique(),
-      nomeCompleto: varchar("nomeCompleto", { length: 200 }).notNull(),
-      dataNascimento: varchar("dataNascimento", { length: 10 }).notNull(),
-      genero: mysqlEnum("genero", ["M", "F", "Outro"]).notNull(),
+      numeroUtente: varchar("numero_utente", { length: 20 }).notNull().unique(),
+      nomeCompleto: varchar("nome_completo", { length: 200 }).notNull(),
+      dataNascimento: varchar("data_nascimento", { length: 10 }).notNull(),
+      genero: varchar("genero", { length: 10 }).notNull(),
       nif: varchar("nif", { length: 9 }),
-      numUtenteSns: varchar("numUtenteSns", { length: 9 }),
-      fotoPerfil: text("fotoPerfil"),
+      numUtenteSns: varchar("num_utente_sns", { length: 9 }),
+      fotoPerfil: text("foto_perfil"),
       contacto: text("contacto"),
       morada: text("morada"),
-      infoMedica: text("infoMedica").notNull(),
-      status: mysqlEnum("status", ["ativo", "inativo", "arquivado"]).notNull().default("ativo"),
+      infoMedica: text("info_medica").notNull(),
+      status: varchar("status", { length: 20 }).notNull().default("ativo"),
       tags: text("tags"),
-      criadoPor: varchar("criadoPor", { length: 64 }).notNull(),
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+      criadoPor: varchar("criado_por", { length: 64 }).notNull(),
+      criadoEm: timestamp("criado_em").defaultNow(),
+      atualizadoEm: timestamp("atualizado_em").defaultNow()
     });
-    consultas = mysqlTable("consultas", {
+    consultas = pgTable("consultas", {
       id: varchar("id", { length: 255 }).primaryKey(),
       utenteId: varchar("utente_id", { length: 255 }).notNull(),
       medicoId: varchar("medico_id", { length: 255 }),
-      dataHora: datetime("data_hora").notNull(),
-      duracao: int("duracao").default(30),
+      dataHora: timestamp("data_hora").notNull(),
+      duracao: integer("duracao").default(30),
       tipoConsulta: varchar("tipo_consulta", { length: 100 }),
       procedimento: text("procedimento"),
-      status: mysqlEnum("status", ["agendada", "confirmada", "realizada", "cancelada", "faltou", "em_atendimento"]).default("agendada"),
+      status: varchar("status", { length: 50 }).default("agendada"),
       observacoes: text("observacoes"),
       valorEstimado: decimal("valor_estimado", { precision: 10, scale: 2 }),
       classificacaoRisco: varchar("classificacao_risco", { length: 10 }),
       criadoEm: timestamp("criado_em").defaultNow(),
-      atualizadoEm: timestamp("atualizado_em").defaultNow().onUpdateNow()
+      atualizadoEm: timestamp("atualizado_em").defaultNow()
     });
-    imagens = mysqlTable("imagens", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      tipo: mysqlEnum("tipo", ["raio_x", "fotografia", "tomografia", "scanner_3d", "outro"]).notNull(),
-      categoria: varchar("categoria", { length: 100 }),
-      url: text("url").notNull(),
-      nomeArquivo: varchar("nomeArquivo", { length: 255 }).notNull(),
-      tamanho: varchar("tamanho", { length: 50 }),
-      dataImagem: varchar("dataImagem", { length: 10 }),
-      descricao: text("descricao"),
-      criadoEm: timestamp("criadoEm").defaultNow()
-    });
-    odontograma = mysqlTable("odontograma", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      numeroDente: varchar("numeroDente", { length: 10 }).notNull(),
-      faces: text("faces"),
-      condicao: varchar("condicao", { length: 100 }),
-      tratamento: varchar("tratamento", { length: 100 }),
+    faturas = pgTable("faturas", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      numero: varchar("numero", { length: 50 }).notNull().unique(),
+      utenteId: varchar("utente_id", { length: 255 }).notNull(),
+      data: timestamp("data").notNull(),
+      valorTotal: decimal("valor_total", { precision: 10, scale: 2 }).notNull(),
+      valorPago: decimal("valor_pago", { precision: 10, scale: 2 }).default("0"),
+      status: varchar("status", { length: 50 }).default("pendente"),
+      metodoPagamento: varchar("metodo_pagamento", { length: 50 }),
       observacoes: text("observacoes"),
-      dataRegistro: varchar("dataRegistro", { length: 10 }),
-      criadoEm: timestamp("criadoEm").defaultNow()
+      criadoEm: timestamp("criado_em").defaultNow(),
+      atualizadoEm: timestamp("atualizado_em").defaultNow()
     });
-    endodontia = mysqlTable("endodontia", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      numeroDente: varchar("numeroDente", { length: 10 }).notNull(),
-      numeroCanais: varchar("numeroCanais", { length: 10 }).notNull(),
-      comprimentoTrabalho: text("comprimentoTrabalho"),
-      tecnicaInstrumentacao: varchar("tecnicaInstrumentacao", { length: 100 }),
-      materialObturacao: varchar("materialObturacao", { length: 100 }),
-      dataInicio: varchar("dataInicio", { length: 10 }),
-      dataFinalizacao: varchar("dataFinalizacao", { length: 10 }),
-      status: mysqlEnum("status", ["em_andamento", "concluido", "retratamento"]).default("em_andamento"),
-      observacoes: text("observacoes"),
-      criadoEm: timestamp("criadoEm").defaultNow()
+    dentistas = pgTable("dentistas", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      especialidade: varchar("especialidade", { length: 100 }),
+      numeroOrdem: varchar("numero_ordem", { length: 50 }),
+      contacto: text("contacto"),
+      ativo: boolean("ativo").default(true),
+      criadoEm: timestamp("criado_em").defaultNow()
     });
-    implantes = mysqlTable("implantes", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      posicao: varchar("posicao", { length: 10 }).notNull(),
-      marca: varchar("marca", { length: 100 }),
-      modelo: varchar("modelo", { length: 100 }),
-      diametro: varchar("diametro", { length: 20 }),
-      comprimento: varchar("comprimento", { length: 20 }),
-      lote: varchar("lote", { length: 50 }),
-      dataColocacao: varchar("dataColocacao", { length: 10 }),
-      dataCarga: varchar("dataCarga", { length: 10 }),
-      tipoProtese: varchar("tipoProtese", { length: 100 }),
-      status: mysqlEnum("status", ["planejado", "colocado", "osseointegrado", "protese_instalada", "falha"]).default("planejado"),
-      observacoes: text("observacoes"),
-      criadoEm: timestamp("criadoEm").defaultNow()
+    comissoes = pgTable("comissoes", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      dentistaId: varchar("dentista_id", { length: 255 }).notNull(),
+      faturaId: varchar("fatura_id", { length: 255 }),
+      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
+      percentual: decimal("percentual", { precision: 5, scale: 2 }),
+      status: varchar("status", { length: 50 }).default("pendente"),
+      dataCriacao: timestamp("data_criacao").defaultNow(),
+      dataPagamento: timestamp("data_pagamento"),
+      formaPagamento: varchar("forma_pagamento", { length: 50 }),
+      observacoes: text("observacoes")
     });
-    laboratorio = mysqlTable("laboratorio", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      tipoTrabalho: varchar("tipoTrabalho", { length: 100 }).notNull(),
-      dentes: varchar("dentes", { length: 255 }),
-      laboratorioNome: varchar("laboratorioNome", { length: 200 }),
-      cor: varchar("cor", { length: 50 }),
-      material: varchar("material", { length: 100 }),
-      dataEnvio: varchar("dataEnvio", { length: 10 }),
-      dataPrevisao: varchar("dataPrevisao", { length: 10 }),
-      dataRecepcao: varchar("dataRecepcao", { length: 10 }),
-      dataInstalacao: varchar("dataInstalacao", { length: 10 }),
-      custo: varchar("custo", { length: 20 }),
-      status: mysqlEnum("status", ["pendente", "enviado", "em_producao", "recebido", "instalado", "ajuste_necessario"]).default("pendente"),
-      observacoes: text("observacoes"),
-      criadoEm: timestamp("criadoEm").defaultNow()
+    configComissoes = pgTable("config_comissoes", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      dentistaId: varchar("dentista_id", { length: 255 }).notNull().unique(),
+      percentualPadrao: decimal("percentual_padrao", { precision: 5, scale: 2 }).default("30"),
+      tipoCalculo: varchar("tipo_calculo", { length: 50 }).default("percentual"),
+      ativo: boolean("ativo").default(true),
+      criadoEm: timestamp("criado_em").defaultNow(),
+      atualizadoEm: timestamp("atualizado_em").defaultNow()
     });
-    ortodontia = mysqlTable("ortodontia", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      tipoAparelho: varchar("tipoAparelho", { length: 100 }),
-      dataInicio: varchar("dataInicio", { length: 10 }),
-      dataPrevisaoTermino: varchar("dataPrevisaoTermino", { length: 10 }),
-      status: mysqlEnum("status", ["ativo", "concluido", "pausado"]).default("ativo"),
-      observacoes: text("observacoes"),
-      criadoEm: timestamp("criadoEm").defaultNow()
-    });
-    ortodontiaConsultas = mysqlTable("ortodontia_consultas", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      ortodontiaId: varchar("ortodontiaId", { length: 64 }).notNull(),
-      dataConsulta: varchar("dataConsulta", { length: 10 }).notNull(),
-      procedimentos: text("procedimentos"),
-      observacoes: text("observacoes"),
-      proximaConsulta: varchar("proximaConsulta", { length: 10 }),
-      criadoEm: timestamp("criadoEm").defaultNow()
-    });
-    periodontograma = mysqlTable("periodontograma", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      numeroDente: varchar("numeroDente", { length: 10 }).notNull(),
-      medicoes: text("medicoes").notNull(),
-      dataAvaliacao: varchar("dataAvaliacao", { length: 10 }).notNull(),
-      criadoEm: timestamp("criadoEm").defaultNow()
-    });
-    prescricoes = mysqlTable("prescricoes", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      dataPrescricao: varchar("dataPrescricao", { length: 10 }).notNull(),
-      medicamentos: text("medicamentos").notNull(),
-      diagnostico: text("diagnostico"),
-      observacoes: text("observacoes"),
-      criadoEm: timestamp("criadoEm").defaultNow()
-    });
-    dentistas = mysqlTable("dentistas", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      nome: varchar("nome", { length: 200 }).notNull(),
-      nomeCompleto: varchar("nomeCompleto", { length: 200 }).notNull(),
-      foto: text("foto"),
-      // Documentos
-      nif: varchar("nif", { length: 9 }).notNull(),
-      numeroOrdem: varchar("numeroOrdem", { length: 20 }).notNull().unique(),
-      especialidades: text("especialidades").notNull(),
-      // JSON array
-      // Contactos
-      email: varchar("email", { length: 320 }).notNull(),
-      telefone: varchar("telefone", { length: 20 }).notNull(),
-      telemovel: varchar("telemovel", { length: 20 }),
-      // Profissional
-      dataAdmissao: varchar("dataAdmissao", { length: 10 }).notNull(),
-      status: mysqlEnum("status", ["ativo", "inativo", "ferias", "licenca"]).notNull().default("ativo"),
-      cargo: varchar("cargo", { length: 100 }),
-      // Horário (JSON)
-      horarioTrabalho: text("horarioTrabalho"),
-      // Configurações
-      corAgenda: varchar("corAgenda", { length: 7 }).default("#3b82f6"),
-      permiteAgendamentoOnline: boolean("permiteAgendamentoOnline").default(true),
-      tempoConsultaPadrao: int("tempoConsultaPadrao").default(30),
-      // Observações
-      observacoes: text("observacoes"),
-      competencias: text("competencias"),
-      // JSON array
-      idiomas: text("idiomas"),
-      // JSON array
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    comissoes = mysqlTable("comissoes", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Referências
-      dentistaId: varchar("dentistaId", { length: 64 }).notNull(),
-      faturaId: varchar("faturaId", { length: 64 }),
-      utenteId: varchar("utenteId", { length: 64 }),
-      // Datas
-      dataReferencia: varchar("dataReferencia", { length: 10 }).notNull(),
-      dataPagamento: varchar("dataPagamento", { length: 10 }),
-      // Valores
-      valorBase: decimal("valorBase", { precision: 10, scale: 2 }).notNull(),
-      valorComissao: decimal("valorComissao", { precision: 10, scale: 2 }).notNull(),
-      bonificacao: decimal("bonificacao", { precision: 10, scale: 2 }).default("0"),
-      valorTotal: decimal("valorTotal", { precision: 10, scale: 2 }).notNull(),
-      // Status
-      status: mysqlEnum("status", ["a_pagar", "pago", "cancelado"]).notNull().default("a_pagar"),
-      // Detalhes
-      tipoComissao: mysqlEnum("tipoComissao", ["percentagem", "fixo", "misto"]).notNull(),
-      percentagemAplicada: decimal("percentagemAplicada", { precision: 5, scale: 2 }),
-      observacoes: text("observacoes"),
-      // Pagamento
-      formaPagamento: varchar("formaPagamento", { length: 50 }),
-      referenciaPagamento: varchar("referenciaPagamento", { length: 100 }),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 }),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    configComissoes = mysqlTable("config_comissoes", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      dentistaId: varchar("dentistaId", { length: 64 }).notNull().unique(),
-      // Tipo de comissão
-      tipo: mysqlEnum("tipo", ["percentagem", "fixo", "misto", "nenhum"]).notNull().default("percentagem"),
-      // Configuração em JSON
-      configuracao: text("configuracao").notNull(),
-      // JSON com detalhes específicos
-      // Pagamento
-      pagarEm: mysqlEnum("pagarEm", ["semanal", "quinzenal", "mensal"]).default("mensal"),
-      diasPagamento: text("diasPagamento"),
-      // JSON array
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    configClinica = mysqlTable("config_clinica", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Dados básicos
-      nomeClinica: varchar("nomeClinica", { length: 200 }).notNull(),
-      nomeFantasia: varchar("nomeFantasia", { length: 200 }),
-      razaoSocial: varchar("razaoSocial", { length: 200 }).notNull(),
-      // Documentos
-      nif: varchar("nif", { length: 9 }).notNull(),
-      numeroRegistro: varchar("numeroRegistro", { length: 50 }),
-      // Contactos
-      telefone: varchar("telefone", { length: 20 }).notNull(),
-      telemovel: varchar("telemovel", { length: 20 }),
-      email: varchar("email", { length: 320 }).notNull(),
-      website: varchar("website", { length: 200 }),
-      // Redes Sociais (JSON)
-      redesSociais: text("redesSociais"),
-      // Morada (JSON)
-      morada: text("morada").notNull(),
-      // Outros
-      anoFundacao: int("anoFundacao"),
-      numeroFuncionarios: int("numeroFuncionarios"),
-      especialidades: text("especialidades"),
-      // JSON array
-      // Horário de funcionamento (JSON)
-      horarioFuncionamento: text("horarioFuncionamento"),
-      // Branding
-      logoPrincipal: text("logoPrincipal"),
-      logoSecundario: text("logoSecundario"),
-      favicon: text("favicon"),
-      paletaCores: text("paletaCores"),
-      // JSON
-      // Configurações de documentos
-      papelTimbrado: text("papelTimbrado"),
-      // JSON
-      nomeSistema: varchar("nomeSistema", { length: 100 }),
-      slogan: varchar("slogan", { length: 200 }),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    formasPagamento = mysqlTable("formas_pagamento", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      nome: varchar("nome", { length: 100 }).notNull(),
+    historicoUtente = pgTable("historico_utente", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      utenteId: varchar("utente_id", { length: 255 }).notNull(),
       tipo: varchar("tipo", { length: 50 }).notNull(),
-      ativo: boolean("ativo").default(true),
-      // Configurações
-      icone: varchar("icone", { length: 50 }),
-      cor: varchar("cor", { length: 7 }),
-      ordem: int("ordem").default(0),
-      // Taxas (JSON)
-      taxa: text("taxa"),
-      // Limites
-      valorMinimo: decimal("valorMinimo", { precision: 10, scale: 2 }),
-      valorMaximo: decimal("valorMaximo", { precision: 10, scale: 2 }),
-      // Integração (JSON)
-      integracao: text("integracao"),
-      // Observações
-      observacoes: text("observacoes"),
-      requerReferencia: boolean("requerReferencia").default(false),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    funcionarios = mysqlTable("funcionarios", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      nome: varchar("nome", { length: 200 }).notNull(),
-      foto: text("foto"),
-      // Documentos
-      nif: varchar("nif", { length: 9 }).notNull(),
-      numeroSegSocial: varchar("numeroSegSocial", { length: 20 }),
-      // Contactos
-      email: varchar("email", { length: 320 }).notNull(),
-      telefone: varchar("telefone", { length: 20 }).notNull(),
-      // Profissional
-      cargo: varchar("cargo", { length: 100 }).notNull(),
-      dataAdmissao: varchar("dataAdmissao", { length: 10 }).notNull(),
-      status: mysqlEnum("status", ["ativo", "inativo", "ferias", "licenca"]).notNull().default("ativo"),
-      // Horário (JSON)
-      horarioTrabalho: text("horarioTrabalho"),
-      // Financeiro (JSON)
-      salario: text("salario"),
-      // Acesso ao sistema (JSON)
-      usuario: text("usuario"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    cadastroLaboratorios = mysqlTable("cadastro_laboratorios", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Dados básicos
-      nome: varchar("nome", { length: 200 }).notNull(),
-      razaoSocial: varchar("razaoSocial", { length: 200 }),
-      nif: varchar("nif", { length: 9 }),
-      // Contactos
-      telefone: varchar("telefone", { length: 20 }).notNull(),
-      telemovel: varchar("telemovel", { length: 20 }),
-      email: varchar("email", { length: 320 }),
-      whatsapp: varchar("whatsapp", { length: 20 }),
-      website: varchar("website", { length: 200 }),
-      // Morada
-      morada: text("morada"),
-      cidade: varchar("cidade", { length: 100 }),
-      codigoPostal: varchar("codigoPostal", { length: 10 }),
-      pais: varchar("pais", { length: 50 }).default("Portugal"),
-      // Informações profissionais
-      responsavelTecnico: varchar("responsavelTecnico", { length: 200 }),
-      especialidades: text("especialidades"),
-      // JSON array: ["protese", "ortodontia", "implantes"]
-      prazoMedioEntrega: int("prazoMedioEntrega").default(7),
-      // dias
-      // Financeiro
-      formasPagamentoAceitas: text("formasPagamentoAceitas"),
-      // JSON array
-      condicoesPagamento: varchar("condicoesPagamento", { length: 200 }),
-      // ex: "30 dias", "à vista"
-      // Status e avaliação
-      status: mysqlEnum("status", ["ativo", "inativo"]).notNull().default("ativo"),
-      avaliacaoQualidade: int("avaliacaoQualidade").default(5),
-      // 1-5 estrelas
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 }),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
-    });
-    trabalhosLaboratorio = mysqlTable("trabalhos_laboratorio", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Referências
-      laboratorioId: varchar("laboratorioId", { length: 64 }).notNull(),
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      dentistaId: varchar("dentistaId", { length: 64 }).notNull(),
-      consultaId: varchar("consultaId", { length: 64 }),
-      // Detalhes do trabalho
-      tipoTrabalho: varchar("tipoTrabalho", { length: 100 }).notNull(),
-      // "coroa", "ponte", "protese", "aparelho"
       descricao: text("descricao").notNull(),
-      dentes: varchar("dentes", { length: 255 }),
-      // "11, 12, 13"
-      cor: varchar("cor", { length: 50 }),
-      material: varchar("material", { length: 100 }),
-      // Datas
-      dataEnvio: varchar("dataEnvio", { length: 10 }),
-      dataPrevisaoEntrega: varchar("dataPrevisaoEntrega", { length: 10 }),
-      dataEntregaReal: varchar("dataEntregaReal", { length: 10 }),
-      dataInstalacao: varchar("dataInstalacao", { length: 10 }),
-      // Financeiro
-      custoLaboratorio: decimal("custoLaboratorio", { precision: 10, scale: 2 }).notNull(),
-      valorCobradoUtente: decimal("valorCobradoUtente", { precision: 10, scale: 2 }),
-      margemLucro: decimal("margemLucro", { precision: 10, scale: 2 }),
-      // Status
-      status: mysqlEnum("status", ["orcamento", "enviado", "em_producao", "recebido", "instalado", "ajuste_necessario", "cancelado"]).default("orcamento"),
-      // Qualidade
-      avaliacaoQualidade: int("avaliacaoQualidade"),
-      // 1-5
-      necessitouAjuste: boolean("necessitouAjuste").default(false),
-      // Observações
-      observacoes: text("observacoes"),
-      observacoesInternas: text("observacoesInternas"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 }),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+      data: timestamp("data").notNull(),
+      criadoPor: varchar("criado_por", { length: 64 }).notNull(),
+      criadoEm: timestamp("criado_em").defaultNow()
     });
-    categoriasDespesa = mysqlTable("categorias_despesa", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      nome: varchar("nome", { length: 100 }).notNull(),
+    procedimentosClinicos = pgTable("procedimentos_clinicos", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      codigo: varchar("codigo", { length: 50 }).notNull().unique(),
+      nome: varchar("nome", { length: 255 }).notNull(),
       descricao: text("descricao"),
-      tipo: mysqlEnum("tipo", ["fixa", "variavel"]).notNull(),
-      icone: varchar("icone", { length: 50 }),
-      cor: varchar("cor", { length: 7 }),
-      // Hierarquia
-      categoriaPai: varchar("categoriaPai", { length: 64 }),
-      // para subcategorias
-      ordem: int("ordem").default(0),
-      // Status
+      categoria: varchar("categoria", { length: 100 }),
+      preco: decimal("preco", { precision: 10, scale: 2 }),
       ativo: boolean("ativo").default(true),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+      criadoEm: timestamp("criado_em").defaultNow()
     });
-    fornecedores = mysqlTable("fornecedores", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Dados básicos
-      nome: varchar("nome", { length: 200 }).notNull(),
-      razaoSocial: varchar("razaoSocial", { length: 200 }),
-      nif: varchar("nif", { length: 9 }),
-      tipo: mysqlEnum("tipo", ["materiais", "equipamentos", "servicos", "laboratorio", "outros"]).notNull(),
-      // Contactos
-      telefone: varchar("telefone", { length: 20 }),
-      email: varchar("email", { length: 320 }),
-      website: varchar("website", { length: 200 }),
-      // Morada
-      morada: text("morada"),
-      // Comercial
-      nomeContato: varchar("nomeContato", { length: 200 }),
-      telefoneContato: varchar("telefoneContato", { length: 20 }),
-      emailContato: varchar("emailContato", { length: 320 }),
-      // Financeiro
-      condicoesPagamento: varchar("condicoesPagamento", { length: 200 }),
-      // Status
-      status: mysqlEnum("status", ["ativo", "inativo"]).notNull().default("ativo"),
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+    tabelaPrecos = pgTable("tabela_precos", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      procedimentoId: varchar("procedimento_id", { length: 255 }).notNull(),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      preco: decimal("preco", { precision: 10, scale: 2 }).notNull(),
+      ativo: boolean("ativo").default(true),
+      criadoEm: timestamp("criado_em").defaultNow()
     });
-    contasPagar = mysqlTable("contas_pagar", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Referências
-      fornecedorId: varchar("fornecedorId", { length: 64 }),
-      categoriaId: varchar("categoriaId", { length: 64 }).notNull(),
-      trabalhoLaboratorioId: varchar("trabalhoLaboratorioId", { length: 64 }),
-      // se for despesa de laboratório
-      // Dados da despesa
-      descricao: varchar("descricao", { length: 255 }).notNull(),
-      numeroDocumento: varchar("numeroDocumento", { length: 50 }),
-      // número da fatura/recibo
-      // Valores
-      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
-      valorPago: decimal("valorPago", { precision: 10, scale: 2 }).default("0"),
-      valorRestante: decimal("valorRestante", { precision: 10, scale: 2 }).notNull(),
-      // Datas
-      dataEmissao: varchar("dataEmissao", { length: 10 }).notNull(),
-      dataVencimento: varchar("dataVencimento", { length: 10 }).notNull(),
-      dataPagamento: varchar("dataPagamento", { length: 10 }),
-      // Status
-      status: mysqlEnum("status", ["pendente", "paga", "parcial", "vencida", "cancelada"]).notNull().default("pendente"),
-      // Recorrência
-      recorrente: boolean("recorrente").default(false),
-      frequenciaRecorrencia: mysqlEnum("frequenciaRecorrencia", ["mensal", "trimestral", "semestral", "anual"]),
-      // Anexos
-      anexos: text("anexos"),
-      // JSON array de URLs
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 }),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+    auditLog = pgTable("audit_log", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      userId: varchar("user_id", { length: 50 }),
+      action: varchar("action", { length: 100 }).notNull(),
+      entity: varchar("entity", { length: 100 }),
+      entityId: varchar("entity_id", { length: 255 }),
+      changes: text("changes"),
+      ipAddress: varchar("ip_address", { length: 45 }),
+      userAgent: text("user_agent"),
+      createdAt: timestamp("created_at").defaultNow()
     });
-    pagamentosContasPagar = mysqlTable("pagamentos_contas_pagar", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      contaPagarId: varchar("contaPagarId", { length: 64 }).notNull(),
-      // Dados do pagamento
-      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
-      dataPagamento: varchar("dataPagamento", { length: 10 }).notNull(),
-      formaPagamento: varchar("formaPagamento", { length: 50 }).notNull(),
-      // Referência
-      referencia: varchar("referencia", { length: 100 }),
-      comprovante: text("comprovante"),
-      // URL do comprovante
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 })
+    notifications = pgTable("notifications", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      userId: varchar("user_id", { length: 50 }).notNull(),
+      type: varchar("type", { length: 50 }).notNull(),
+      title: varchar("title", { length: 255 }).notNull(),
+      message: text("message").notNull(),
+      read: boolean("read").default(false),
+      createdAt: timestamp("created_at").defaultNow()
     });
-    contasReceber = mysqlTable("contas_receber", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Referências
-      utenteId: varchar("utenteId", { length: 64 }).notNull(),
-      dentistaId: varchar("dentistaId", { length: 64 }),
-      consultaId: varchar("consultaId", { length: 64 }),
-      // Dados da fatura
-      numeroFatura: varchar("numeroFatura", { length: 50 }).notNull().unique(),
-      serie: varchar("serie", { length: 10 }).default("FT"),
-      tipo: mysqlEnum("tipo", ["fatura", "recibo", "fatura_recibo", "nota_credito"]).notNull().default("fatura"),
-      // Valores
-      subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
-      descontoTotal: decimal("descontoTotal", { precision: 10, scale: 2 }).default("0"),
-      ivaTotal: decimal("ivaTotal", { precision: 10, scale: 2 }).default("0"),
-      total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-      valorPago: decimal("valorPago", { precision: 10, scale: 2 }).default("0"),
-      valorRestante: decimal("valorRestante", { precision: 10, scale: 2 }).notNull(),
-      // Comissões do Dentista
-      dentistaPercentagem: decimal("dentistaPercentagem", { precision: 5, scale: 2 }).default("0"),
-      dentistaComissao: decimal("dentistaComissao", { precision: 10, scale: 2 }).default("0"),
-      valorClinica: decimal("valorClinica", { precision: 10, scale: 2 }).default("0"),
-      // Datas
-      dataEmissao: varchar("dataEmissao", { length: 10 }).notNull(),
-      dataVencimento: varchar("dataVencimento", { length: 10 }).notNull(),
-      // Status
-      status: mysqlEnum("status", ["pendente", "paga", "parcial", "vencida", "cancelada"]).notNull().default("pendente"),
-      // Itens da fatura (JSON)
-      itens: text("itens").notNull(),
-      // JSON array de itens
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 }),
-      atualizadoEm: timestamp("atualizadoEm").defaultNow().onUpdateNow()
+    userPermissions = pgTable("user_permissions", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      userId: varchar("user_id", { length: 50 }).notNull(),
+      permission: varchar("permission", { length: 100 }).notNull(),
+      granted: boolean("granted").default(true),
+      createdAt: timestamp("created_at").defaultNow()
     });
-    pagamentosContasReceber = mysqlTable("pagamentos_contas_receber", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      contaReceberId: varchar("contaReceberId", { length: 64 }).notNull(),
-      // Dados do pagamento
-      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
-      dataPagamento: varchar("dataPagamento", { length: 10 }).notNull(),
-      formaPagamentoId: varchar("formaPagamentoId", { length: 64 }).notNull(),
-      // Referência
-      referencia: varchar("referencia", { length: 100 }),
-      comprovante: text("comprovante"),
-      // URL do comprovante
-      // Taxas (para cartão de crédito, etc)
-      taxaOperacao: decimal("taxaOperacao", { precision: 10, scale: 2 }).default("0"),
-      valorLiquido: decimal("valorLiquido", { precision: 10, scale: 2 }).notNull(),
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 })
-    });
-    movimentosCaixa = mysqlTable("movimentos_caixa", {
-      id: varchar("id", { length: 64 }).primaryKey(),
-      // Tipo de movimento
-      tipo: mysqlEnum("tipo", ["entrada", "saida", "abertura", "fechamento", "sangria", "reforco"]).notNull(),
-      // Referências
-      contaReceberId: varchar("contaReceberId", { length: 64 }),
-      contaPagarId: varchar("contaPagarId", { length: 64 }),
-      // Dados do movimento
-      descricao: varchar("descricao", { length: 255 }).notNull(),
-      valor: decimal("valor", { precision: 10, scale: 2 }).notNull(),
-      formaPagamento: varchar("formaPagamento", { length: 50 }).notNull(),
-      // Data e hora
-      dataHora: datetime("dataHora").notNull(),
-      // Saldos
-      saldoAnterior: decimal("saldoAnterior", { precision: 10, scale: 2 }),
-      saldoAtual: decimal("saldoAtual", { precision: 10, scale: 2 }),
-      // Observações
-      observacoes: text("observacoes"),
-      // Auditoria
-      criadoEm: timestamp("criadoEm").defaultNow(),
-      criadoPor: varchar("criadoPor", { length: 64 })
+    configClinica = pgTable("config_clinica", {
+      id: varchar("id", { length: 255 }).primaryKey(),
+      chave: varchar("chave", { length: 100 }).notNull().unique(),
+      valor: text("valor"),
+      tipo: varchar("tipo", { length: 50 }),
+      descricao: text("descricao"),
+      atualizadoEm: timestamp("atualizado_em").defaultNow()
     });
   }
 });
@@ -756,18 +344,46 @@ var init_db_mock = __esm({
 // server/db.ts
 var db_exports = {};
 __export(db_exports, {
+  atualizarConsulta: () => atualizarConsulta,
+  atualizarLaboratorio: () => atualizarLaboratorio,
+  atualizarUtente: () => atualizarUtente,
+  criarComissao: () => criarComissao,
+  criarConsulta: () => criarConsulta,
+  criarLaboratorio: () => criarLaboratorio,
+  criarUtente: () => criarUtente,
   db: () => db,
+  excluirLaboratorio: () => excluirLaboratorio,
   getDb: () => getDb,
   getUser: () => getUser2,
   getUtente: () => getUtente2,
   getUtentes: () => getUtentes2,
   getUtentesStats: () => getUtentesStats2,
+  listarComissoesDentista: () => listarComissoesDentista,
+  listarConsultas: () => listarConsultas,
+  listarConsultasPorData: () => listarConsultasPorData,
+  listarConsultasPorMedico: () => listarConsultasPorMedico,
+  listarConsultasPorPeriodo: () => listarConsultasPorPeriodo,
+  listarLaboratorios: () => listarLaboratorios,
+  listarUtentes: () => listarUtentes,
+  obterConfigComissao: () => obterConfigComissao,
+  obterConsulta: () => obterConsulta,
+  obterEstatisticasConsultas: () => obterEstatisticasConsultas,
+  obterEstatisticasUtentes: () => obterEstatisticasUtentes,
+  obterLaboratorio: () => obterLaboratorio,
+  obterUtente: () => obterUtente,
+  pagarComissao: () => pagarComissao,
+  pesquisarUtentes: () => pesquisarUtentes,
+  removerConsulta: () => removerConsulta,
+  removerLaboratorio: () => removerLaboratorio,
   removerUtente: () => removerUtente2,
-  upsertUser: () => upsertUser2
+  salvarConfigComissao: () => salvarConfigComissao,
+  schema: () => schema_exports,
+  upsertUser: () => upsertUser2,
+  verificarConflito: () => verificarConflito
 });
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 async function getUser2(userId) {
   if (useMockData) return getUser(userId);
   return db.query.users.findFirst({ where: (users2, { eq: eq2 }) => eq2(users2.id, userId) });
@@ -780,17 +396,352 @@ async function getUtentes2() {
   if (useMockData) return (void 0)();
   return db.query.utentes.findMany();
 }
+async function listarUtentes() {
+  if (useMockData) return (void 0)();
+  return db.query.utentes.findMany({
+    orderBy: (utentes2, { desc }) => [desc(utentes2.criadoEm)]
+  });
+}
 async function getUtente2(id) {
   if (useMockData) return (void 0)(id);
   return db.query.utentes.findFirst({ where: (utentes2, { eq: eq2 }) => eq2(utentes2.id, id) });
 }
-async function getUtentesStats2() {
-  if (useMockData) return (void 0)();
-  return { total: 0, ativos: 0, inativos: 0, arquivados: 0 };
+async function obterUtente(id) {
+  return getUtente2(id);
+}
+async function pesquisarUtentes(termo) {
+  if (useMockData) return [];
+  try {
+    const result = await db.query.utentes.findMany({
+      where: (utentes2, { or, like: like2 }) => or(
+        like2(utentes2.nomeCompleto, `%${termo}%`),
+        like2(utentes2.nif, `%${termo}%`),
+        like2(utentes2.numeroUtente, `%${termo}%`)
+      ),
+      limit: 50
+    });
+    return result;
+  } catch (error) {
+    console.error("[DB] Erro ao pesquisar utentes:", error);
+    return [];
+  }
+}
+async function criarUtente(dados) {
+  if (useMockData) return { id: "mock-utente-id", ...dados };
+  try {
+    const id = `utente-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const numeroUtente = `U${Date.now().toString().substr(-8)}`;
+    const dadosInsert = {
+      id,
+      numeroUtente,
+      nomeCompleto: dados.nomeCompleto,
+      dataNascimento: dados.dataNascimento,
+      genero: dados.genero,
+      nif: dados.nif || null,
+      numUtenteSns: dados.numUtenteSns || null,
+      fotoPerfil: dados.fotoPerfil || null,
+      contacto: JSON.stringify(dados.contacto),
+      morada: dados.morada ? JSON.stringify(dados.morada) : null,
+      infoMedica: JSON.stringify(dados.infoMedica),
+      status: dados.status || "ativo",
+      tags: dados.tags ? JSON.stringify(dados.tags) : null,
+      criadoPor: dados.criadoPor
+    };
+    await db.insert(utentes).values(dadosInsert);
+    return { id, numeroUtente, ...dadosInsert };
+  } catch (error) {
+    console.error("[DB] Erro ao criar utente:", error);
+    throw error;
+  }
+}
+async function atualizarUtente(id, dados) {
+  if (useMockData) return { id, ...dados };
+  try {
+    await db.update(utentes).set({
+      ...dados,
+      atualizadoEm: /* @__PURE__ */ new Date()
+    }).where(eq(utentes.id, id));
+    return { id, ...dados };
+  } catch (error) {
+    console.error("[DB] Erro ao atualizar utente:", error);
+    throw error;
+  }
 }
 async function removerUtente2(id) {
   if (useMockData) return removerUtente(id);
-  return db.delete(utentes).where(eq(utentes.id, id));
+  try {
+    await db.update(utentes).set({ status: "arquivado" }).where(eq(utentes.id, id));
+    return { success: true };
+  } catch (error) {
+    console.error("[DB] Erro ao remover utente:", error);
+    throw error;
+  }
+}
+async function getUtentesStats2() {
+  if (useMockData) return (void 0)();
+  try {
+    const result = await db.select({
+      total: sql`count(*)`,
+      ativos: sql`sum(case when status = 'ativo' then 1 else 0 end)`,
+      inativos: sql`sum(case when status = 'inativo' then 1 else 0 end)`,
+      arquivados: sql`sum(case when status = 'arquivado' then 1 else 0 end)`
+    }).from(utentes);
+    return {
+      total: Number(result[0].total) || 0,
+      ativos: Number(result[0].ativos) || 0,
+      inativos: Number(result[0].inativos) || 0,
+      arquivados: Number(result[0].arquivados) || 0
+    };
+  } catch (error) {
+    console.error("[DB] Erro ao obter estat\xEDsticas de utentes:", error);
+    return { total: 0, ativos: 0, inativos: 0, arquivados: 0 };
+  }
+}
+async function obterEstatisticasUtentes() {
+  return getUtentesStats2();
+}
+async function criarConsulta(dados) {
+  if (useMockData) return { id: "mock-consulta-id", ...dados };
+  try {
+    const id = `consulta-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const dadosInsert = {
+      id,
+      utenteId: dados.utenteId,
+      medicoId: dados.medicoId || null,
+      dataHora: new Date(dados.dataHora),
+      duracao: dados.duracao || 30,
+      tipoConsulta: dados.tipoConsulta || null,
+      procedimento: dados.procedimento || null,
+      status: dados.status || "agendada",
+      observacoes: dados.observacoes || null,
+      valorEstimado: dados.valorEstimado || null,
+      classificacaoRisco: dados.classificacaoRisco || null
+    };
+    await db.insert(consultas).values(dadosInsert);
+    return { id, ...dadosInsert };
+  } catch (error) {
+    console.error("[DB] Erro ao criar consulta:", error);
+    throw error;
+  }
+}
+async function listarConsultas() {
+  if (useMockData) return [];
+  try {
+    return db.query.consultas.findMany({
+      orderBy: (consultas2, { desc }) => [desc(consultas2.dataHora)]
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao listar consultas:", error);
+    return [];
+  }
+}
+async function listarConsultasPorData(data) {
+  if (useMockData) return [];
+  try {
+    const dataInicio = new Date(data);
+    dataInicio.setHours(0, 0, 0, 0);
+    const dataFim = new Date(data);
+    dataFim.setHours(23, 59, 59, 999);
+    return db.query.consultas.findMany({
+      where: (consultas2, { and: and2, gte: gte2, lte: lte2 }) => and2(
+        gte2(consultas2.dataHora, dataInicio),
+        lte2(consultas2.dataHora, dataFim)
+      ),
+      orderBy: (consultas2, { asc }) => [asc(consultas2.dataHora)]
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao listar consultas por data:", error);
+    return [];
+  }
+}
+async function listarConsultasPorMedico(medicoId) {
+  if (useMockData) return [];
+  try {
+    return db.query.consultas.findMany({
+      where: (consultas2, { eq: eq2 }) => eq2(consultas2.medicoId, medicoId),
+      orderBy: (consultas2, { desc }) => [desc(consultas2.dataHora)]
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao listar consultas por m\xE9dico:", error);
+    return [];
+  }
+}
+async function listarConsultasPorPeriodo(dataInicio, dataFim) {
+  if (useMockData) return [];
+  try {
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    return db.query.consultas.findMany({
+      where: (consultas2, { and: and2, gte: gte2, lte: lte2 }) => and2(
+        gte2(consultas2.dataHora, inicio),
+        lte2(consultas2.dataHora, fim)
+      ),
+      orderBy: (consultas2, { asc }) => [asc(consultas2.dataHora)]
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao listar consultas por per\xEDodo:", error);
+    return [];
+  }
+}
+async function obterConsulta(id) {
+  if (useMockData) return null;
+  try {
+    return db.query.consultas.findFirst({
+      where: (consultas2, { eq: eq2 }) => eq2(consultas2.id, id)
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao obter consulta:", error);
+    return null;
+  }
+}
+async function atualizarConsulta(id, dados) {
+  if (useMockData) return { id, ...dados };
+  try {
+    await db.update(consultas).set({
+      ...dados,
+      atualizadoEm: /* @__PURE__ */ new Date()
+    }).where(eq(consultas.id, id));
+    return { id, ...dados };
+  } catch (error) {
+    console.error("[DB] Erro ao atualizar consulta:", error);
+    throw error;
+  }
+}
+async function removerConsulta(id) {
+  if (useMockData) return { success: true };
+  try {
+    await db.delete(consultas).where(eq(consultas.id, id));
+    return { success: true };
+  } catch (error) {
+    console.error("[DB] Erro ao remover consulta:", error);
+    throw error;
+  }
+}
+async function verificarConflito(medicoId, dataHora, duracao = 30) {
+  if (useMockData) return false;
+  try {
+    const dataInicio = new Date(dataHora);
+    const dataFim = new Date(dataHora);
+    dataFim.setMinutes(dataFim.getMinutes() + duracao);
+    const consultas2 = await db.query.consultas.findMany({
+      where: (consultas3, { and: and2, eq: eq2, gte: gte2, lte: lte2, or }) => and2(
+        eq2(consultas3.medicoId, medicoId),
+        or(
+          and2(
+            gte2(consultas3.dataHora, dataInicio),
+            lte2(consultas3.dataHora, dataFim)
+          )
+        )
+      )
+    });
+    return consultas2.length > 0;
+  } catch (error) {
+    console.error("[DB] Erro ao verificar conflito:", error);
+    return false;
+  }
+}
+async function obterEstatisticasConsultas() {
+  if (useMockData) return { total: 0, agendadas: 0, realizadas: 0, canceladas: 0 };
+  try {
+    const result = await db.select({
+      total: sql`count(*)`,
+      agendadas: sql`sum(case when status = 'agendada' then 1 else 0 end)`,
+      confirmadas: sql`sum(case when status = 'confirmada' then 1 else 0 end)`,
+      realizadas: sql`sum(case when status = 'realizada' then 1 else 0 end)`,
+      canceladas: sql`sum(case when status = 'cancelada' then 1 else 0 end)`,
+      faltou: sql`sum(case when status = 'faltou' then 1 else 0 end)`
+    }).from(consultas);
+    return {
+      total: Number(result[0].total) || 0,
+      agendadas: Number(result[0].agendadas) || 0,
+      confirmadas: Number(result[0].confirmadas) || 0,
+      realizadas: Number(result[0].realizadas) || 0,
+      canceladas: Number(result[0].canceladas) || 0,
+      faltou: Number(result[0].faltou) || 0
+    };
+  } catch (error) {
+    console.error("[DB] Erro ao obter estat\xEDsticas de consultas:", error);
+    return { total: 0, agendadas: 0, confirmadas: 0, realizadas: 0, canceladas: 0, faltou: 0 };
+  }
+}
+async function obterConfigComissao(dentistaId) {
+  if (useMockData) return null;
+  try {
+    if (!configComissoes) {
+      console.warn("[DB] Tabela config_comissoes n\xE3o encontrada no schema");
+      return {
+        dentistaId,
+        percentualPadrao: 30,
+        tipoCalculo: "percentual"
+      };
+    }
+    return db.query.configComissoes.findFirst({
+      where: (config, { eq: eq2 }) => eq2(config.dentistaId, dentistaId)
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao obter config de comiss\xE3o:", error);
+    return {
+      dentistaId,
+      percentualPadrao: 30,
+      tipoCalculo: "percentual"
+    };
+  }
+}
+async function criarComissao(dados) {
+  if (useMockData) return { id: "mock-comissao-id", ...dados };
+  try {
+    if (!comissoes) {
+      console.warn("[DB] Tabela comissoes n\xE3o encontrada no schema");
+      return { id: "temp-comissao-id", ...dados };
+    }
+    const id = `comissao-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const dadosInsert = {
+      id,
+      dentistaId: dados.dentistaId,
+      faturaId: dados.faturaId || null,
+      valor: dados.valor,
+      percentual: dados.percentual || null,
+      status: dados.status || "pendente",
+      dataCriacao: /* @__PURE__ */ new Date(),
+      dataPagamento: dados.dataPagamento || null,
+      observacoes: dados.observacoes || null
+    };
+    await db.insert(comissoes).values(dadosInsert);
+    return { id, ...dadosInsert };
+  } catch (error) {
+    console.error("[DB] Erro ao criar comiss\xE3o:", error);
+    throw error;
+  }
+}
+async function listarComissoesDentista(dentistaId, mes) {
+  if (useMockData) return [];
+  try {
+    if (!comissoes) {
+      console.warn("[DB] Tabela comissoes n\xE3o encontrada no schema");
+      return [];
+    }
+    if (mes) {
+      const [ano, mesNum] = mes.split("-");
+      const dataInicio = new Date(parseInt(ano), parseInt(mesNum) - 1, 1);
+      const dataFim = new Date(parseInt(ano), parseInt(mesNum), 0, 23, 59, 59);
+      return db.query.comissoes.findMany({
+        where: (comissoes2, { and: and2, eq: eq2, gte: gte2, lte: lte2 }) => and2(
+          eq2(comissoes2.dentistaId, dentistaId),
+          gte2(comissoes2.dataCriacao, dataInicio),
+          lte2(comissoes2.dataCriacao, dataFim)
+        ),
+        orderBy: (comissoes2, { desc }) => [desc(comissoes2.dataCriacao)]
+      });
+    } else {
+      return db.query.comissoes.findMany({
+        where: (comissoes2, { eq: eq2 }) => eq2(comissoes2.dentistaId, dentistaId),
+        orderBy: (comissoes2, { desc }) => [desc(comissoes2.dataCriacao)]
+      });
+    }
+  } catch (error) {
+    console.error("[DB] Erro ao listar comiss\xF5es do dentista:", error);
+    return [];
+  }
 }
 async function getDb() {
   if (useMockData) {
@@ -798,6 +749,145 @@ async function getDb() {
     return null;
   }
   return pool;
+}
+async function pagarComissao(id, formaPagamento, dataPagamento) {
+  if (useMockData) return { id, status: "pago" };
+  try {
+    if (!comissoes) {
+      console.warn("[DB] Tabela comissoes n\xE3o encontrada no schema");
+      return { id, status: "pago" };
+    }
+    await db.update(comissoes).set({
+      status: "pago",
+      dataPagamento: dataPagamento || /* @__PURE__ */ new Date(),
+      formaPagamento
+    }).where(eq(comissoes.id, id));
+    return { id, status: "pago" };
+  } catch (error) {
+    console.error("[DB] Erro ao pagar comiss\xE3o:", error);
+    throw error;
+  }
+}
+async function salvarConfigComissao(dados) {
+  if (useMockData) return { id: "mock-config-id", ...dados };
+  try {
+    if (!configComissoes) {
+      console.warn("[DB] Tabela config_comissoes n\xE3o encontrada no schema");
+      return { id: "temp-config-id", ...dados };
+    }
+    const id = dados.id || `config-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const dadosInsert = {
+      id,
+      dentistaId: dados.dentistaId,
+      percentualPadrao: dados.percentualPadrao || 30,
+      tipoCalculo: dados.tipoCalculo || "percentual",
+      ativo: dados.ativo !== void 0 ? dados.ativo : true
+    };
+    await db.insert(configComissoes).values(dadosInsert).onConflictDoUpdate({
+      target: configComissoes.dentistaId,
+      set: dadosInsert
+    });
+    return { id, ...dadosInsert };
+  } catch (error) {
+    console.error("[DB] Erro ao salvar config de comiss\xE3o:", error);
+    throw error;
+  }
+}
+async function listarLaboratorios() {
+  if (useMockData) return [];
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return [];
+    }
+    return db.query.laboratorios.findMany({
+      orderBy: (laboratorios2, { asc }) => [asc(laboratorios2.nome)]
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao listar laborat\xF3rios:", error);
+    return [];
+  }
+}
+async function criarLaboratorio(dados) {
+  if (useMockData) return { id: "mock-lab-id", ...dados };
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return { id: "temp-lab-id", ...dados };
+    }
+    const id = `lab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const dadosInsert = {
+      id,
+      nome: dados.nome,
+      contacto: dados.contacto ? JSON.stringify(dados.contacto) : null,
+      morada: dados.morada ? JSON.stringify(dados.morada) : null,
+      especialidades: dados.especialidades ? JSON.stringify(dados.especialidades) : null,
+      observacoes: dados.observacoes || null,
+      ativo: dados.ativo !== void 0 ? dados.ativo : true
+    };
+    await db.insert(void 0).values(dadosInsert);
+    return { id, ...dadosInsert };
+  } catch (error) {
+    console.error("[DB] Erro ao criar laborat\xF3rio:", error);
+    throw error;
+  }
+}
+async function atualizarLaboratorio(id, dados) {
+  if (useMockData) return { id, ...dados };
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return { id, ...dados };
+    }
+    await db.update(void 0).set(dados).where(eq((void 0).id, id));
+    return { id, ...dados };
+  } catch (error) {
+    console.error("[DB] Erro ao atualizar laborat\xF3rio:", error);
+    throw error;
+  }
+}
+async function removerLaboratorio(id) {
+  if (useMockData) return { success: true };
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return { success: true };
+    }
+    await db.update(void 0).set({ ativo: false }).where(eq((void 0).id, id));
+    return { success: true };
+  } catch (error) {
+    console.error("[DB] Erro ao remover laborat\xF3rio:", error);
+    throw error;
+  }
+}
+async function obterLaboratorio(id) {
+  if (useMockData) return null;
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return null;
+    }
+    return db.query.laboratorios.findFirst({
+      where: (laboratorios2, { eq: eq2 }) => eq2(laboratorios2.id, id)
+    });
+  } catch (error) {
+    console.error("[DB] Erro ao obter laborat\xF3rio:", error);
+    return null;
+  }
+}
+async function excluirLaboratorio(id) {
+  if (useMockData) return { success: true };
+  try {
+    if (!void 0) {
+      console.warn("[DB] Tabela laboratorios n\xE3o encontrada no schema");
+      return { success: true };
+    }
+    await db.update(void 0).set({ ativo: false }).where(eq((void 0).id, id));
+    return { success: true };
+  } catch (error) {
+    console.error("[DB] Erro ao excluir laborat\xF3rio:", error);
+    throw error;
+  }
 }
 var Pool, pool, db, useMockData;
 var init_db = __esm({
@@ -825,6 +915,9 @@ var init_db = __esm({
           pool = null;
         });
         db = drizzle(pool, { schema: schema_exports });
+        if (db) {
+          db.schema = schema_exports;
+        }
       } catch (error) {
         console.error("[PostgreSQL] Failed to create connection pool:", error);
         pool = null;
@@ -1966,7 +2059,7 @@ import { z as z2 } from "zod";
 init_db();
 async function calcularECriarComissao(faturaId, dentistaId, valorFatura) {
   try {
-    const config = await (void 0)(dentistaId);
+    const config = await obterConfigComissao(dentistaId);
     if (!config) {
       console.log(`Dentista ${dentistaId} n\xE3o tem configura\xE7\xE3o de comiss\xE3o`);
       return;
@@ -1989,7 +2082,7 @@ async function calcularECriarComissao(faturaId, dentistaId, valorFatura) {
       valorComissao = config.valorMaximo;
     }
     const mes = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
-    await (void 0)({
+    await criarComissao({
       dentistaId,
       faturaId,
       valor: valorComissao,
@@ -2191,32 +2284,32 @@ var financeiroRouter = router({
     dataFim: z2.string().optional(),
     pesquisa: z2.string().optional()
   }).optional()).query(({ input }) => {
-    let faturas = [...faturasMock];
+    let faturas2 = [...faturasMock];
     if (input) {
       if (input.utenteId) {
-        faturas = faturas.filter((f) => f.utenteId === input.utenteId);
+        faturas2 = faturas2.filter((f) => f.utenteId === input.utenteId);
       }
       if (input.dentista) {
-        faturas = faturas.filter((f) => f.dentista.toLowerCase().includes(input.dentista.toLowerCase()));
+        faturas2 = faturas2.filter((f) => f.dentista.toLowerCase().includes(input.dentista.toLowerCase()));
       }
       if (input.estado) {
-        faturas = faturas.filter((f) => f.estado === input.estado);
+        faturas2 = faturas2.filter((f) => f.estado === input.estado);
       }
       if (input.dataInicio) {
-        faturas = faturas.filter((f) => f.data >= input.dataInicio);
+        faturas2 = faturas2.filter((f) => f.data >= input.dataInicio);
       }
       if (input.dataFim) {
-        faturas = faturas.filter((f) => f.data <= input.dataFim);
+        faturas2 = faturas2.filter((f) => f.data <= input.dataFim);
       }
       if (input.pesquisa) {
         const termo = input.pesquisa.toLowerCase();
-        faturas = faturas.filter(
+        faturas2 = faturas2.filter(
           (f) => f.numero.toLowerCase().includes(termo) || f.utenteNome.toLowerCase().includes(termo) || f.dentista.toLowerCase().includes(termo)
         );
       }
     }
-    faturas.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-    return faturas;
+    faturas2.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    return faturas2;
   }),
   // Obter fatura por ID
   obter: publicProcedure.input(z2.object({ id: z2.string() })).query(({ input }) => {
@@ -2403,20 +2496,20 @@ var financeiroRouter = router({
     dataInicio: z2.string(),
     dataFim: z2.string()
   })).query(({ input }) => {
-    const faturas = faturasMock.filter(
+    const faturas2 = faturasMock.filter(
       (f) => f.data >= input.dataInicio && f.data <= input.dataFim
     );
-    const receitaTotal = faturas.reduce((sum, f) => sum + f.total, 0);
-    const receitaPaga = faturas.filter((f) => f.estado === "paga").reduce((sum, f) => sum + f.total, 0);
-    const receitaPendente = faturas.filter((f) => f.estado === "pendente" || f.estado === "parcial").reduce((sum, f) => sum + f.valorEmDivida, 0);
-    const totalFaturas = faturas.length;
-    const faturasPagas = faturas.filter((f) => f.estado === "paga").length;
-    const faturasPendentes = faturas.filter((f) => f.estado === "pendente").length;
-    const faturasVencidas = faturas.filter((f) => f.estado === "vencida").length;
-    const faturasAnuladas = faturas.filter((f) => f.estado === "anulada").length;
+    const receitaTotal = faturas2.reduce((sum, f) => sum + f.total, 0);
+    const receitaPaga = faturas2.filter((f) => f.estado === "paga").reduce((sum, f) => sum + f.total, 0);
+    const receitaPendente = faturas2.filter((f) => f.estado === "pendente" || f.estado === "parcial").reduce((sum, f) => sum + f.valorEmDivida, 0);
+    const totalFaturas = faturas2.length;
+    const faturasPagas = faturas2.filter((f) => f.estado === "paga").length;
+    const faturasPendentes = faturas2.filter((f) => f.estado === "pendente").length;
+    const faturasVencidas = faturas2.filter((f) => f.estado === "vencida").length;
+    const faturasAnuladas = faturas2.filter((f) => f.estado === "anulada").length;
     const ticketMedio = totalFaturas > 0 ? receitaTotal / totalFaturas : 0;
     const pagamentosPorMetodo = /* @__PURE__ */ new Map();
-    faturas.forEach((f) => {
+    faturas2.forEach((f) => {
       f.pagamentos.forEach((p) => {
         const atual = pagamentosPorMetodo.get(p.metodo) || { valor: 0, quantidade: 0 };
         pagamentosPorMetodo.set(p.metodo, {
@@ -2430,7 +2523,7 @@ var financeiroRouter = router({
       ...dados
     }));
     const faturasPorDentista = /* @__PURE__ */ new Map();
-    faturas.forEach((f) => {
+    faturas2.forEach((f) => {
       const atual = faturasPorDentista.get(f.dentista) || { valor: 0, quantidade: 0 };
       faturasPorDentista.set(f.dentista, {
         valor: atual.valor + f.total,
@@ -2551,8 +2644,8 @@ var dentistasRouter = router({
   }),
   // Obter configuração de comissão
   obterConfigComissao: protectedProcedure.input(z3.object({ dentistaId: z3.string() })).query(async ({ input }) => {
-    const { obterConfigComissao: obterConfigComissao4 } = await Promise.resolve().then(() => (init_db(), db_exports));
-    return await obterConfigComissao4(input.dentistaId);
+    const { obterConfigComissao: obterConfigComissao3 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    return await obterConfigComissao3(input.dentistaId);
   }),
   // Salvar configuração de comissão
   salvarConfigComissao: protectedProcedure.input(
@@ -2760,11 +2853,11 @@ var comissoesRouter = router({
       mes: z5.string().optional()
     })
   ).query(async ({ input }) => {
-    return await (void 0)(input.dentistaId, input.mes);
+    return await listarComissoesDentista(input.dentistaId, input.mes);
   }),
   // Obter resumo de comissões
   resumo: protectedProcedure.input(z5.object({ dentistaId: z5.string() })).query(async ({ input }) => {
-    const comissoes2 = await (void 0)(input.dentistaId);
+    const comissoes2 = await listarComissoesDentista(input.dentistaId);
     const resumo = {
       totalPendente: 0,
       totalPago: 0,
@@ -2798,7 +2891,7 @@ var comissoesRouter = router({
       observacoes: z5.string().optional()
     })
   ).mutation(async ({ input }) => {
-    return await (void 0)(input);
+    return await criarComissao(input);
   }),
   // Marcar comissão como paga
   pagar: protectedProcedure.input(
@@ -2808,11 +2901,11 @@ var comissoesRouter = router({
       referencia: z5.string().optional()
     })
   ).mutation(async ({ input }) => {
-    return await (void 0)(input.id, input.formaPagamento, input.referencia);
+    return await pagarComissao(input.id, input.formaPagamento, input.referencia);
   }),
   // Obter configuração de comissão do dentista
   obterConfig: protectedProcedure.input(z5.object({ dentistaId: z5.string() })).query(async ({ input }) => {
-    return await (void 0)(input.dentistaId);
+    return await obterConfigComissao(input.dentistaId);
   }),
   // Salvar configuração de comissão
   salvarConfig: protectedProcedure.input(
@@ -2826,7 +2919,7 @@ var comissoesRouter = router({
       observacoes: z5.string().optional()
     })
   ).mutation(async ({ input }) => {
-    return await (void 0)(input);
+    return await salvarConfigComissao(input);
   })
 });
 
@@ -2846,17 +2939,17 @@ var laboratoriosRouter = router({
       pesquisa: z6.string().optional()
     }).optional()
   ).query(async ({ input }) => {
-    return await (void 0)();
+    return await listarLaboratorios();
   }),
   /**
    * Obter laboratório por ID
    */
   obter: publicProcedure.input(z6.object({ id: z6.string() })).query(async ({ input }) => {
-    const laboratorio2 = await (void 0)(input.id);
-    if (!laboratorio2) {
+    const laboratorio = await obterLaboratorio(input.id);
+    if (!laboratorio) {
       throw new Error("Laborat\xF3rio n\xE3o encontrado");
     }
-    return laboratorio2;
+    return laboratorio;
   }),
   /**
    * Criar novo laboratório
@@ -2887,7 +2980,7 @@ var laboratoriosRouter = router({
       criadoPor: z6.string().optional()
     })
   ).mutation(async ({ input }) => {
-    return await (void 0)(input);
+    return await criarLaboratorio(input);
   }),
   /**
    * Atualizar laboratório
@@ -2917,13 +3010,13 @@ var laboratoriosRouter = router({
     })
   ).mutation(async ({ input }) => {
     const { id, ...data } = input;
-    return await (void 0)(id, data);
+    return await atualizarLaboratorio(id, data);
   }),
   /**
    * Excluir laboratório (soft delete)
    */
   excluir: publicProcedure.input(z6.object({ id: z6.string() })).mutation(async ({ input }) => {
-    await (void 0)(input.id);
+    await excluirLaboratorio(input.id);
     return { success: true };
   }),
   // ========================================
@@ -5724,7 +5817,7 @@ async function gerarFaturaAutomatica(dados) {
   const descontoTotal = 0;
   const ivaTotal = subtotal * 0.23;
   const total = subtotal + ivaTotal;
-  const configComissao = await obterConfigComissao3(dados.dentistaId);
+  const configComissao = await obterConfigComissao2(dados.dentistaId);
   let dentistaComissao = 0;
   let dentistaPercentagem = 0;
   if (configComissao) {
@@ -5819,7 +5912,7 @@ async function listarComissoesDentista2(dentistaId, mes, status) {
 }
 async function pagarComissao2(comissaoId, formaPagamento, referencia) {
 }
-async function obterConfigComissao3(dentistaId) {
+async function obterConfigComissao2(dentistaId) {
   return {
     id: "config-1",
     dentistaId,
@@ -6109,7 +6202,7 @@ var integracaoRouter = router({
     }),
     // Obter configuração
     obterConfig: protectedProcedure.input(z24.object({ dentistaId: z24.string() })).query(async ({ input }) => {
-      return await obterConfigComissao3(input.dentistaId);
+      return await obterConfigComissao2(input.dentistaId);
     }),
     // Salvar configuração
     salvarConfig: protectedProcedure.input(
@@ -6159,23 +6252,25 @@ var integracaoRouter = router({
 // server/routers/auth.ts
 import { z as z25 } from "zod";
 
-// server/services/auth.service.ts
+// server/services/auth-simple.service.ts
+init_db();
 import { SignJWT as SignJWT2, jwtVerify as jwtVerify2 } from "jose";
 import { nanoid } from "nanoid";
+import bcrypt from "bcrypt";
 var JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 var JWT_EXPIRES_IN = "7d";
 var SESSION_EXPIRES_IN = 7 * 24 * 60 * 60 * 1e3;
+var SALT_ROUNDS = 10;
 async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + JWT_SECRET);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hashHex;
+  return await bcrypt.hash(password, SALT_ROUNDS);
 }
 async function verifyPassword(password, hash) {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (error) {
+    console.error("Erro ao verificar senha:", error);
+    return false;
+  }
 }
 async function generateToken(payload) {
   const secret = new TextEncoder().encode(JWT_SECRET);
@@ -6195,279 +6290,155 @@ async function verifyToken(token) {
     return null;
   }
 }
-var AuthService = class {
-  db;
-  constructor(db2) {
-    this.db = db2;
+var AuthServiceSimple = class {
+  /**
+   * Login de usuário usando queries SQL diretas
+   */
+  static async login(credentials, ipAddress, userAgent) {
+    const pool2 = await getDb();
+    if (!pool2) {
+      throw new Error("Database not available");
+    }
+    try {
+      const result = await pool2.query(
+        "SELECT id, name, email, password_hash, role, status, dentista_id FROM users WHERE email = $1",
+        [credentials.email]
+      );
+      if (result.rows.length === 0) {
+        throw new Error("Email ou senha inv\xE1lidos");
+      }
+      const user = result.rows[0];
+      if (user.status === "bloqueado") {
+        throw new Error("Conta bloqueada. Entre em contato com o administrador.");
+      }
+      const isValidPassword = await verifyPassword(credentials.password, user.password_hash);
+      if (!isValidPassword) {
+        throw new Error("Email ou senha inv\xE1lidos");
+      }
+      await pool2.query(
+        "UPDATE users SET last_signed_in = NOW(), updated_at = NOW() WHERE id = $1",
+        [user.id]
+      );
+      const sessionId = nanoid();
+      const token = await generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        sessionId
+      });
+      const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN);
+      await pool2.query(
+        "INSERT INTO user_sessions (id, user_id, token, expires_at, ip_address, user_agent, created_at) VALUES ($1, $2, $3, $4, $5, $6, NOW())",
+        [sessionId, user.id, token, expiresAt, ipAddress || null, userAgent || null]
+      );
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          dentistaId: user.dentista_id || void 0
+        },
+        token,
+        expiresAt
+      };
+    } catch (error) {
+      console.error("[AuthServiceSimple] Login error:", error);
+      throw error;
+    }
   }
   /**
    * Registrar novo usuário
    */
-  async register(data) {
-    const existingUser = await this.db.query.users.findFirst({
-      where: (users2, { eq: eq2 }) => eq2(users2.email, data.email)
-    });
-    if (existingUser) {
-      throw new Error("Email j\xE1 cadastrado");
+  static async register(data) {
+    const pool2 = await getDb();
+    if (!pool2) {
+      throw new Error("Database not available");
     }
-    const passwordHash = await hashPassword(data.password);
-    const userId = nanoid();
-    const newUser = {
-      id: userId,
-      email: data.email,
-      password_hash: passwordHash,
-      name: data.name,
-      role: data.role || "user",
-      status: "ativo",
-      email_verified: 0,
-      dentista_id: data.dentistaId || null,
-      created_at: /* @__PURE__ */ new Date(),
-      updated_at: /* @__PURE__ */ new Date()
-    };
-    await this.db.insert(this.db.schema.users).values(newUser);
-    const sessionId = nanoid();
-    const token = await generateToken({
-      userId: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-      sessionId
-    });
-    const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN);
-    await this.db.insert(this.db.schema.user_sessions).values({
-      id: sessionId,
-      user_id: userId,
-      token,
-      expires_at: expiresAt,
-      is_active: 1,
-      created_at: /* @__PURE__ */ new Date()
-    });
-    await this.createDefaultPermissions(userId, data.role || "user");
-    return {
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-        dentistaId: newUser.dentista_id || void 0
-      },
-      token,
-      expiresAt
-    };
+    try {
+      const existingUser = await pool2.query(
+        "SELECT id FROM users WHERE email = $1",
+        [data.email]
+      );
+      if (existingUser.rows.length > 0) {
+        throw new Error("Email j\xE1 cadastrado");
+      }
+      const passwordHash = await hashPassword(data.password);
+      const userId = nanoid();
+      await pool2.query(
+        "INSERT INTO users (id, name, email, password_hash, role, status, dentista_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())",
+        [userId, data.name, data.email, passwordHash, data.role || "user", "ativo", data.dentistaId || null]
+      );
+      const sessionId = nanoid();
+      const token = await generateToken({
+        userId,
+        email: data.email,
+        role: data.role || "user",
+        sessionId
+      });
+      const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN);
+      await pool2.query(
+        "INSERT INTO user_sessions (id, user_id, token, expires_at, created_at) VALUES ($1, $2, $3, $4, NOW())",
+        [sessionId, userId, token, expiresAt]
+      );
+      return {
+        user: {
+          id: userId,
+          email: data.email,
+          name: data.name,
+          role: data.role || "user",
+          dentistaId: data.dentistaId
+        },
+        token,
+        expiresAt
+      };
+    } catch (error) {
+      console.error("[AuthServiceSimple] Register error:", error);
+      throw error;
+    }
   }
   /**
-   * Login de usuário
+   * Verificar sessão
    */
-  async login(credentials, ipAddress, userAgent) {
-    const user = await this.db.query.users.findFirst({
-      where: (users2, { eq: eq2 }) => eq2(users2.email, credentials.email)
-    });
-    if (!user) {
-      throw new Error("Email ou senha inv\xE1lidos");
+  static async verifySession(token) {
+    const payload = await verifyToken(token);
+    if (!payload) {
+      return null;
     }
-    if (user.status === "bloqueado") {
-      throw new Error("Conta bloqueada. Entre em contato com o administrador.");
+    const pool2 = await getDb();
+    if (!pool2) {
+      return payload;
     }
-    if (user.locked_until && new Date(user.locked_until) > /* @__PURE__ */ new Date()) {
-      throw new Error("Conta temporariamente bloqueada. Tente novamente mais tarde.");
-    }
-    const isValidPassword = await verifyPassword(credentials.password, user.password_hash);
-    if (!isValidPassword) {
-      const loginAttempts = (user.login_attempts || 0) + 1;
-      const updates = {
-        login_attempts: loginAttempts,
-        updated_at: /* @__PURE__ */ new Date()
-      };
-      if (loginAttempts >= 5) {
-        updates.locked_until = new Date(Date.now() + 30 * 60 * 1e3);
+    try {
+      const result = await pool2.query(
+        "SELECT id FROM user_sessions WHERE id = $1 AND expires_at > NOW()",
+        [payload.sessionId]
+      );
+      if (result.rows.length === 0) {
+        return null;
       }
-      await this.db.update(this.db.schema.users).set(updates).where((users2, { eq: eq2 }) => eq2(users2.id, user.id));
-      throw new Error("Email ou senha inv\xE1lidos");
+      return payload;
+    } catch (error) {
+      console.error("[AuthServiceSimple] Session verification error:", error);
+      return payload;
     }
-    await this.db.update(this.db.schema.users).set({
-      login_attempts: 0,
-      locked_until: null,
-      last_login: /* @__PURE__ */ new Date(),
-      updated_at: /* @__PURE__ */ new Date()
-    }).where((users2, { eq: eq2 }) => eq2(users2.id, user.id));
-    const sessionId = nanoid();
-    const token = await generateToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      sessionId
-    });
-    const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN);
-    await this.db.insert(this.db.schema.user_sessions).values({
-      id: sessionId,
-      user_id: user.id,
-      token,
-      ip_address: ipAddress,
-      user_agent: userAgent,
-      expires_at: expiresAt,
-      is_active: 1,
-      created_at: /* @__PURE__ */ new Date(),
-      last_activity: /* @__PURE__ */ new Date()
-    });
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        dentistaId: user.dentista_id || void 0
-      },
-      token,
-      expiresAt
-    };
   }
   /**
    * Logout
    */
-  async logout(token) {
-    const payload = await verifyToken(token);
-    if (!payload) {
-      throw new Error("Token inv\xE1lido");
-    }
-    await this.db.update(this.db.schema.user_sessions).set({ is_active: 0 }).where((sessions, { eq: eq2 }) => eq2(sessions.id, payload.sessionId));
-  }
-  /**
-   * Verificar token e retornar usuário
-   */
-  async verifySession(token) {
-    const payload = await verifyToken(token);
-    if (!payload) {
-      return null;
-    }
-    const session = await this.db.query.user_sessions.findFirst({
-      where: (sessions, { eq: eq2, and }) => and(
-        eq2(sessions.id, payload.sessionId),
-        eq2(sessions.is_active, 1)
-      )
-    });
-    if (!session) {
-      return null;
-    }
-    if (new Date(session.expires_at) < /* @__PURE__ */ new Date()) {
-      await this.db.update(this.db.schema.user_sessions).set({ is_active: 0 }).where((sessions, { eq: eq2 }) => eq2(sessions.id, session.id));
-      return null;
-    }
-    await this.db.update(this.db.schema.user_sessions).set({ last_activity: /* @__PURE__ */ new Date() }).where((sessions, { eq: eq2 }) => eq2(sessions.id, session.id));
-    const user = await this.db.query.users.findFirst({
-      where: (users2, { eq: eq2 }) => eq2(users2.id, payload.userId)
-    });
-    return user || null;
-  }
-  /**
-   * Criar permissões padrão baseadas no role
-   */
-  async createDefaultPermissions(userId, role) {
-    const permissions = [];
-    if (role === "admin") {
+  static async logout(sessionId) {
+    const pool2 = await getDb();
+    if (!pool2) {
       return;
     }
-    if (role === "dentista") {
-      const modules = [
-        "agenda",
-        "utentes",
-        "odontograma",
-        "periodontograma",
-        "endodontia",
-        "implantes",
-        "ortodontia",
-        "prescricoes",
-        "imagens",
-        "comissoes"
-      ];
-      for (const module of modules) {
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "read",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "create",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "update",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-      }
+    try {
+      await pool2.query(
+        "DELETE FROM user_sessions WHERE id = $1",
+        [sessionId]
+      );
+    } catch (error) {
+      console.error("[AuthServiceSimple] Logout error:", error);
     }
-    if (role === "recepcionista") {
-      const readModules = [
-        "agenda",
-        "utentes",
-        "faturacao",
-        "relatorios"
-      ];
-      for (const module of readModules) {
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "read",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-      }
-      const writeModules = ["agenda", "utentes"];
-      for (const module of writeModules) {
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "create",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-        permissions.push({
-          id: nanoid(),
-          user_id: userId,
-          module,
-          action: "update",
-          granted: 1,
-          created_at: /* @__PURE__ */ new Date()
-        });
-      }
-    }
-    if (permissions.length > 0) {
-      await this.db.insert(this.db.schema.user_permissions).values(permissions);
-    }
-  }
-  /**
-   * Verificar se usuário tem permissão
-   */
-  async hasPermission(userId, module, action) {
-    const user = await this.db.query.users.findFirst({
-      where: (users2, { eq: eq2 }) => eq2(users2.id, userId)
-    });
-    if (!user) {
-      return false;
-    }
-    if (user.role === "admin") {
-      return true;
-    }
-    const permission = await this.db.query.user_permissions.findFirst({
-      where: (permissions, { eq: eq2, and }) => and(
-        eq2(permissions.user_id, userId),
-        eq2(permissions.module, module),
-        eq2(permissions.action, action),
-        eq2(permissions.granted, 1)
-      )
-    });
-    return !!permission;
   }
 };
 
@@ -6501,10 +6472,9 @@ var authRouter = router({
    */
   login: publicProcedure.input(loginSchema).mutation(async ({ input, ctx }) => {
     try {
-      const authService = new AuthService(ctx.db);
       const ipAddress = ctx.req?.ip || ctx.req?.socket?.remoteAddress;
       const userAgent = ctx.req?.headers?.["user-agent"];
-      const result = await authService.login(input, ipAddress, userAgent);
+      const result = await AuthServiceSimple.login(input, ipAddress, userAgent);
       return {
         success: true,
         data: result
@@ -6521,8 +6491,7 @@ var authRouter = router({
    */
   register: publicProcedure.input(registerSchema).mutation(async ({ input, ctx }) => {
     try {
-      const authService = new AuthService(ctx.db);
-      const result = await authService.register(input);
+      const result = await AuthServiceSimple.register(input);
       return {
         success: true,
         data: result
@@ -6602,7 +6571,7 @@ var authRouter = router({
         });
       }
       const permissions = await ctx.db.query.user_permissions.findMany({
-        where: (perms, { eq: eq2, and }) => and(
+        where: (perms, { eq: eq2, and: and2 }) => and2(
           eq2(perms.user_id, user.id),
           eq2(perms.granted, 1)
         )
@@ -6735,7 +6704,7 @@ var authRouter = router({
         });
       }
       const sessions = await ctx.db.query.user_sessions.findMany({
-        where: (sessions2, { eq: eq2, and }) => and(
+        where: (sessions2, { eq: eq2, and: and2 }) => and2(
           eq2(sessions2.user_id, user.id),
           eq2(sessions2.is_active, 1)
         ),
@@ -6776,7 +6745,7 @@ var authRouter = router({
         });
       }
       const session = await ctx.db.query.user_sessions.findFirst({
-        where: (sessions, { eq: eq2, and }) => and(
+        where: (sessions, { eq: eq2, and: and2 }) => and2(
           eq2(sessions.id, input.sessionId),
           eq2(sessions.user_id, user.id)
         )
@@ -6823,18 +6792,18 @@ var appRouter = router({
   utentes: router({
     // Listar todos os utentes
     listar: protectedProcedure.query(async () => {
-      const { listarUtentes } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarUtentes();
+      const { listarUtentes: listarUtentes2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await listarUtentes2();
     }),
     // Obter utente por ID
     obter: protectedProcedure.input(z26.object({ id: z26.string() })).query(async ({ input }) => {
-      const { obterUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterUtente(input.id);
+      const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await obterUtente2(input.id);
     }),
     // Pesquisar utentes
     pesquisar: protectedProcedure.input(z26.object({ termo: z26.string() })).query(async ({ input }) => {
-      const { pesquisarUtentes } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await pesquisarUtentes(input.termo);
+      const { pesquisarUtentes: pesquisarUtentes2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await pesquisarUtentes2(input.termo);
     }),
     // Criar novo utente
     criar: protectedProcedure.input(
@@ -6869,8 +6838,8 @@ var appRouter = router({
         tags: z26.array(z26.string()).optional()
       })
     ).mutation(async ({ input, ctx }) => {
-      const { criarUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await criarUtente({
+      const { criarUtente: criarUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await criarUtente2({
         ...input,
         status: "ativo",
         criadoPor: ctx.user.id
@@ -6913,13 +6882,13 @@ var appRouter = router({
         })
       })
     ).mutation(async ({ input }) => {
-      const { atualizarUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { atualizarUtente: atualizarUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const dados = { ...input.dados };
       if (dados.contacto) dados.contacto = JSON.stringify(dados.contacto);
       if (dados.morada) dados.morada = JSON.stringify(dados.morada);
       if (dados.infoMedica) dados.infoMedica = JSON.stringify(dados.infoMedica);
       if (dados.tags) dados.tags = JSON.stringify(dados.tags);
-      return await atualizarUtente(input.id, dados);
+      return await atualizarUtente2(input.id, dados);
     }),
     // Remover utente (soft delete)
     remover: protectedProcedure.input(z26.object({ id: z26.string() })).mutation(async ({ input }) => {
@@ -6929,8 +6898,8 @@ var appRouter = router({
     }),
     // Obter estatísticas
     estatisticas: protectedProcedure.query(async () => {
-      const { obterEstatisticasUtentes } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterEstatisticasUtentes();
+      const { obterEstatisticasUtentes: obterEstatisticasUtentes2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await obterEstatisticasUtentes2();
     })
   }),
   // ========================================
@@ -6944,9 +6913,9 @@ var appRouter = router({
         sintomas: z26.string()
       })
     ).mutation(async ({ input }) => {
-      const { obterUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { analisarSintomas: analisarSintomas2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
-      const utente = await obterUtente(input.utenteId);
+      const utente = await obterUtente2(input.utenteId);
       if (!utente) throw new Error("Utente n\xE3o encontrado");
       const infoMedica = typeof utente.infoMedica === "string" ? JSON.parse(utente.infoMedica) : utente.infoMedica;
       const idade = (/* @__PURE__ */ new Date()).getFullYear() - new Date(utente.dataNascimento).getFullYear();
@@ -6967,9 +6936,9 @@ var appRouter = router({
         dosagem: z26.string()
       })
     ).mutation(async ({ input }) => {
-      const { obterUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { verificarMedicamento: verificarMedicamento2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
-      const utente = await obterUtente(input.utenteId);
+      const utente = await obterUtente2(input.utenteId);
       if (!utente) throw new Error("Utente n\xE3o encontrado");
       const infoMedica = typeof utente.infoMedica === "string" ? JSON.parse(utente.infoMedica) : utente.infoMedica;
       const idade = (/* @__PURE__ */ new Date()).getFullYear() - new Date(utente.dataNascimento).getFullYear();
@@ -6995,9 +6964,9 @@ var appRouter = router({
     }),
     // Análise de Risco
     analisarRisco: protectedProcedure.input(z26.object({ utenteId: z26.string() })).mutation(async ({ input }) => {
-      const { obterUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { analisarRiscoPaciente: analisarRiscoPaciente2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
-      const utente = await obterUtente(input.utenteId);
+      const utente = await obterUtente2(input.utenteId);
       if (!utente) throw new Error("Utente n\xE3o encontrado");
       const infoMedica = typeof utente.infoMedica === "string" ? JSON.parse(utente.infoMedica) : utente.infoMedica;
       const idade = (/* @__PURE__ */ new Date()).getFullYear() - new Date(utente.dataNascimento).getFullYear();
@@ -7014,9 +6983,9 @@ var appRouter = router({
         pergunta: z26.string()
       })
     ).mutation(async ({ input }) => {
-      const { obterUtente } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { obterUtente: obterUtente2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { assistenteVirtual: assistenteVirtual2 } = await Promise.resolve().then(() => (init_ai_helper(), ai_helper_exports));
-      const utente = await obterUtente(input.utenteId);
+      const utente = await obterUtente2(input.utenteId);
       if (!utente) throw new Error("Utente n\xE3o encontrado");
       const infoMedica = typeof utente.infoMedica === "string" ? JSON.parse(utente.infoMedica) : utente.infoMedica;
       const idade = (/* @__PURE__ */ new Date()).getFullYear() - new Date(utente.dataNascimento).getFullYear();
@@ -7070,13 +7039,13 @@ var appRouter = router({
   consultas: router({
     // Listar todas as consultas
     listar: protectedProcedure.query(async () => {
-      const { listarConsultas } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultas();
+      const { listarConsultas: listarConsultas2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await listarConsultas2();
     }),
     // Obter consulta por ID
     obter: protectedProcedure.input(z26.object({ id: z26.string() })).query(async ({ input }) => {
-      const { obterConsulta } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterConsulta(input.id);
+      const { obterConsulta: obterConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await obterConsulta2(input.id);
     }),
     // Criar nova consulta
     criar: protectedProcedure.input(
@@ -7093,9 +7062,9 @@ var appRouter = router({
         classificacaoRisco: z26.string().optional().nullable()
       })
     ).mutation(async ({ input }) => {
-      const { criarConsulta, verificarConflito } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { criarConsulta: criarConsulta2, verificarConflito: verificarConflito2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       if (input.medicoId) {
-        const temConflito = await verificarConflito(
+        const temConflito = await verificarConflito2(
           input.medicoId,
           input.dataHora,
           input.duracao || 30
@@ -7104,7 +7073,7 @@ var appRouter = router({
           throw new Error("J\xE1 existe uma consulta agendada para este m\xE9dico neste hor\xE1rio");
         }
       }
-      return await criarConsulta(input);
+      return await criarConsulta2(input);
     }),
     // Atualizar consulta
     atualizar: protectedProcedure.input(
@@ -7122,14 +7091,14 @@ var appRouter = router({
         classificacaoRisco: z26.string().optional().nullable()
       })
     ).mutation(async ({ input }) => {
-      const { atualizarConsulta, verificarConflito, obterConsulta } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { atualizarConsulta: atualizarConsulta2, verificarConflito: verificarConflito2, obterConsulta: obterConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       if (input.medicoId || input.dataHora || input.duracao) {
-        const consultaAtual = await obterConsulta(input.id);
+        const consultaAtual = await obterConsulta2(input.id);
         const medicoId = input.medicoId !== void 0 ? input.medicoId : consultaAtual.medicoId;
         const dataHora = input.dataHora || consultaAtual.dataHora;
         const duracao = input.duracao || consultaAtual.duracao;
         if (medicoId) {
-          const temConflito = await verificarConflito(
+          const temConflito = await verificarConflito2(
             medicoId,
             dataHora,
             duracao,
@@ -7141,31 +7110,31 @@ var appRouter = router({
         }
       }
       const { id, ...dados } = input;
-      return await atualizarConsulta(id, dados);
+      return await atualizarConsulta2(id, dados);
     }),
     // Remover consulta
     remover: protectedProcedure.input(z26.object({ id: z26.string() })).mutation(async ({ input }) => {
-      const { removerConsulta } = await Promise.resolve().then(() => (init_db(), db_exports));
-      await removerConsulta(input.id);
+      const { removerConsulta: removerConsulta2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      await removerConsulta2(input.id);
       return { success: true };
     }),
     // Listar consultas por data
     listarPorData: protectedProcedure.input(z26.object({ data: z26.string() })).query(async ({ input }) => {
-      const { listarConsultasPorData } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorData(input.data);
+      const { listarConsultasPorData: listarConsultasPorData2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await listarConsultasPorData2(input.data);
     }),
     // Listar consultas por período
     listarPorPeriodo: protectedProcedure.input(z26.object({
       dataInicio: z26.string(),
       dataFim: z26.string()
     })).query(async ({ input }) => {
-      const { listarConsultasPorPeriodo } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorPeriodo(input.dataInicio, input.dataFim);
+      const { listarConsultasPorPeriodo: listarConsultasPorPeriodo2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await listarConsultasPorPeriodo2(input.dataInicio, input.dataFim);
     }),
     // Listar consultas por médico
     listarPorMedico: protectedProcedure.input(z26.object({ medicoId: z26.string() })).query(async ({ input }) => {
-      const { listarConsultasPorMedico } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await listarConsultasPorMedico(input.medicoId);
+      const { listarConsultasPorMedico: listarConsultasPorMedico2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await listarConsultasPorMedico2(input.medicoId);
     }),
     // Verificar conflito de horário
     verificarConflito: protectedProcedure.input(z26.object({
@@ -7174,8 +7143,8 @@ var appRouter = router({
       duracao: z26.number(),
       consultaIdExcluir: z26.string().optional()
     })).query(async ({ input }) => {
-      const { verificarConflito } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await verificarConflito(
+      const { verificarConflito: verificarConflito2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await verificarConflito2(
         input.medicoId,
         input.dataHora,
         input.duracao,
@@ -7184,8 +7153,8 @@ var appRouter = router({
     }),
     // Obter estatísticas
     estatisticas: protectedProcedure.query(async () => {
-      const { obterEstatisticasConsultas } = await Promise.resolve().then(() => (init_db(), db_exports));
-      return await obterEstatisticasConsultas();
+      const { obterEstatisticasConsultas: obterEstatisticasConsultas2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      return await obterEstatisticasConsultas2();
     })
   }),
   // ========================================
@@ -7288,6 +7257,7 @@ var appRouter = router({
 });
 
 // server/_core/context.ts
+init_db();
 async function createContext(opts) {
   let user = null;
   try {
@@ -7298,7 +7268,8 @@ async function createContext(opts) {
   return {
     req: opts.req,
     res: opts.res,
-    user
+    user,
+    db
   };
 }
 
