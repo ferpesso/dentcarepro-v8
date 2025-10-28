@@ -27,6 +27,23 @@ import {
   FileText,
   AlertCircle,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { exportarRelatorioClinicaExcel } from "@/lib/export-excel";
+import { exportarRelatorioClinicaPDF } from "@/lib/export-pdf";
 
 export default function RelatorioClinica() {
   const [dataInicio, setDataInicio] = useState("2025-10-01");
@@ -97,6 +114,64 @@ export default function RelatorioClinica() {
     }).format(valor);
   };
 
+  const handleExportarPDF = () => {
+    const custosDetalhados = [
+      { categoria: "Comissões Dentistas", valor: relatorio.custos.comissoesDentistas, percentagem: (relatorio.custos.comissoesDentistas / relatorio.custos.total) * 100 },
+      { categoria: "Contas a Pagar", valor: relatorio.custos.contasPagar, percentagem: (relatorio.custos.contasPagar / relatorio.custos.total) * 100 },
+      { categoria: "Laboratórios", valor: relatorio.custos.laboratorios, percentagem: (relatorio.custos.laboratorios / relatorio.custos.total) * 100 },
+      { categoria: "Estoque", valor: relatorio.custos.estoque, percentagem: (relatorio.custos.estoque / relatorio.custos.total) * 100 },
+      { categoria: "Outros", valor: relatorio.custos.outros, percentagem: (relatorio.custos.outros / relatorio.custos.total) * 100 },
+    ];
+
+    exportarRelatorioClinicaPDF({
+      periodo: relatorio.periodo,
+      financeiro: {
+        faturacaoTotal: relatorio.faturacao.totalFaturado,
+        custosTotais: relatorio.custos.total,
+        lucroBruto: relatorio.lucro.bruto,
+        lucroLiquido: relatorio.lucro.liquido,
+        margemLucro: relatorio.lucro.margem,
+      },
+      custos: custosDetalhados,
+      dentistas: relatorio.porDentista.map((d) => ({
+        nome: d.nome,
+        procedimentos: d.procedimentos,
+        faturacao: d.faturacao,
+        comissoes: d.comissoes,
+      })),
+      procedimentos: relatorio.porProcedimento,
+    });
+  };
+
+  const handleExportarExcel = () => {
+    const custosDetalhados = [
+      { categoria: "Comissões Dentistas", valor: relatorio.custos.comissoesDentistas, percentagem: (relatorio.custos.comissoesDentistas / relatorio.custos.total) * 100 },
+      { categoria: "Contas a Pagar", valor: relatorio.custos.contasPagar, percentagem: (relatorio.custos.contasPagar / relatorio.custos.total) * 100 },
+      { categoria: "Laboratórios", valor: relatorio.custos.laboratorios, percentagem: (relatorio.custos.laboratorios / relatorio.custos.total) * 100 },
+      { categoria: "Estoque", valor: relatorio.custos.estoque, percentagem: (relatorio.custos.estoque / relatorio.custos.total) * 100 },
+      { categoria: "Outros", valor: relatorio.custos.outros, percentagem: (relatorio.custos.outros / relatorio.custos.total) * 100 },
+    ];
+
+    exportarRelatorioClinicaExcel({
+      periodo: relatorio.periodo,
+      financeiro: {
+        faturacaoTotal: relatorio.faturacao.totalFaturado,
+        custosTotais: relatorio.custos.total,
+        lucroBruto: relatorio.lucro.bruto,
+        lucroLiquido: relatorio.lucro.liquido,
+        margemLucro: relatorio.lucro.margem,
+      },
+      custos: custosDetalhados,
+      dentistas: relatorio.porDentista.map((d) => ({
+        nome: d.nome,
+        procedimentos: d.procedimentos,
+        faturacao: d.faturacao,
+        comissoes: d.comissoes,
+      })),
+      procedimentos: relatorio.porProcedimento,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
@@ -108,11 +183,11 @@ export default function RelatorioClinica() {
               <CardDescription>Análise financeira e operacional completa</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportarPDF}>
                 <Download className="h-4 w-4" />
                 Exportar PDF
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportarExcel}>
                 <FileText className="h-4 w-4" />
                 Exportar Excel
               </Button>
@@ -262,39 +337,77 @@ export default function RelatorioClinica() {
         </Card>
       </div>
 
-      {/* Detalhamento de Custos */}
+      {/* Gráficos */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Gráfico de Custos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Detalhamento de Custos</CardTitle>
+            <CardDescription>Distribuição dos custos operacionais</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Comissões", value: relatorio.custos.comissoesDentistas, fill: "#ef4444" },
+                    { name: "Laboratórios", value: relatorio.custos.laboratorios, fill: "#f59e0b" },
+                    { name: "Contas a Pagar", value: relatorio.custos.contasPagar, fill: "#eab308" },
+                    { name: "Estoque", value: relatorio.custos.estoque, fill: "#84cc16" },
+                    { name: "Outros", value: relatorio.custos.outros, fill: "#22c55e" },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  dataKey="value"
+                >
+                </Pie>
+                <Tooltip formatter={(value) => formatarMoeda(Number(value))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Faturação por Procedimento */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Faturação por Procedimento</CardTitle>
+            <CardDescription>Top procedimentos por valor</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={relatorio.porProcedimento}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="tipo" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatarMoeda(Number(value))} />
+                <Bar dataKey="faturacao" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráfico de Performance por Dentista */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Detalhamento de Custos</CardTitle>
+          <CardTitle className="text-base">Performance por Dentista</CardTitle>
+          <CardDescription>Faturação e comissões</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[
-              { label: "Comissões de Dentistas", valor: relatorio.custos.comissoesDentistas },
-              { label: "Contas a Pagar", valor: relatorio.custos.contasPagar },
-              { label: "Laboratórios", valor: relatorio.custos.laboratorios },
-              { label: "Estoque/Materiais", valor: relatorio.custos.estoque },
-              { label: "Outros", valor: relatorio.custos.outros },
-            ].map((item) => {
-              const percentual = (item.valor / relatorio.custos.total) * 100;
-              return (
-                <div key={item.label} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{item.label}</span>
-                    <span className="font-medium">
-                      {formatarMoeda(item.valor)} ({percentual.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-red-500"
-                      style={{ width: `${percentual}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={relatorio.porDentista}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="nome" />
+              <YAxis />
+              <Tooltip formatter={(value) => formatarMoeda(Number(value))} />
+              <Legend />
+              <Bar dataKey="faturacao" fill="#3b82f6" name="Faturação" />
+              <Bar dataKey="comissoes" fill="#ef4444" name="Comissões" />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
 

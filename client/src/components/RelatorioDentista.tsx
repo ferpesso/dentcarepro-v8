@@ -25,6 +25,21 @@ import {
   Download,
   FileText,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { exportarRelatorioDentistaExcel } from "@/lib/export-excel";
+import { exportarRelatorioDentistaPDF } from "@/lib/export-pdf";
 
 interface RelatorioDentistaProps {
   dentistaId: string;
@@ -108,6 +123,52 @@ export default function RelatorioDentista({ dentistaId, dentistaNome }: Relatori
     return new Date(data).toLocaleDateString("pt-PT");
   };
 
+  const handleExportarPDF = () => {
+    exportarRelatorioDentistaPDF({
+      dentistaNome,
+      periodo: relatorio.periodo,
+      procedimentos: [],
+      comissoes: relatorio.comissoes.lista.map((c) => ({
+        data: c.dataPagamento || relatorio.periodo.fim,
+        fatura: c.faturaId,
+        valor: c.valor,
+        percentagem: c.percentagem,
+        status: c.status,
+      })),
+      estatisticas: {
+        totalProcedimentos: relatorio.procedimentos.total,
+        totalFaturacao: relatorio.faturacao.totalFaturado,
+        totalComissoes: relatorio.comissoes.totalComissoes,
+        comissoesPagas: relatorio.comissoes.totalPago,
+        comissoesPendentes: relatorio.comissoes.totalPendente,
+        ticketMedio: relatorio.estatisticas.ticketMedio,
+      },
+    });
+  };
+
+  const handleExportarExcel = () => {
+    exportarRelatorioDentistaExcel({
+      dentistaNome,
+      periodo: relatorio.periodo,
+      procedimentos: [],
+      comissoes: relatorio.comissoes.lista.map((c) => ({
+        data: c.dataPagamento || relatorio.periodo.fim,
+        fatura: c.faturaId,
+        valor: c.valor,
+        percentagem: c.percentagem,
+        status: c.status,
+      })),
+      estatisticas: {
+        totalProcedimentos: relatorio.procedimentos.total,
+        totalFaturacao: relatorio.faturacao.totalFaturado,
+        totalComissoes: relatorio.comissoes.totalComissoes,
+        comissoesPagas: relatorio.comissoes.totalPago,
+        comissoesPendentes: relatorio.comissoes.totalPendente,
+        ticketMedio: relatorio.estatisticas.ticketMedio,
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
@@ -119,11 +180,11 @@ export default function RelatorioDentista({ dentistaId, dentistaNome }: Relatori
               <CardDescription>{dentistaNome}</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportarPDF}>
                 <Download className="h-4 w-4" />
                 Exportar PDF
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportarExcel}>
                 <FileText className="h-4 w-4" />
                 Exportar Excel
               </Button>
@@ -216,36 +277,71 @@ export default function RelatorioDentista({ dentistaId, dentistaNome }: Relatori
         </Card>
       </div>
 
-      {/* Procedimentos por Tipo */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Procedimentos por Tipo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {Object.entries(relatorio.procedimentos.porTipo).map(([tipo, quantidade]) => {
-              const percentual =
-                (quantidade / relatorio.procedimentos.total) * 100;
-              return (
-                <div key={tipo} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="capitalize">{tipo}</span>
-                    <span className="font-medium">
-                      {quantidade} ({percentual.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500"
-                      style={{ width: `${percentual}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Gráficos */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Gráfico de Procedimentos por Tipo */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Procedimentos por Tipo</CardTitle>
+            <CardDescription>Distribuição dos procedimentos realizados</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: "Limpeza", value: relatorio.procedimentos.porTipo.limpeza, fill: "#3b82f6" },
+                    { name: "Restauração", value: relatorio.procedimentos.porTipo.restauracao, fill: "#10b981" },
+                    { name: "Endodontia", value: relatorio.procedimentos.porTipo.endodontia, fill: "#f59e0b" },
+                    { name: "Extração", value: relatorio.procedimentos.porTipo.extracao, fill: "#ef4444" },
+                    { name: "Prótese", value: relatorio.procedimentos.porTipo.protese, fill: "#8b5cf6" },
+                    { name: "Implante", value: relatorio.procedimentos.porTipo.implante, fill: "#ec4899" },
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  dataKey="value"
+                >
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Comissões */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Comissões</CardTitle>
+            <CardDescription>Status das comissões</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={[
+                  { name: "Pagas", valor: relatorio.comissoes.totalPago, fill: "#10b981" },
+                  { name: "Pendentes", valor: relatorio.comissoes.totalPendente, fill: "#f59e0b" },
+                ]}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatarMoeda(Number(value))} />
+                <Bar dataKey="valor">
+                  {[
+                    { name: "Pagas", valor: relatorio.comissoes.totalPago, fill: "#10b981" },
+                    { name: "Pendentes", valor: relatorio.comissoes.totalPendente, fill: "#f59e0b" },
+                  ].map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Comissões */}
       <Card>
