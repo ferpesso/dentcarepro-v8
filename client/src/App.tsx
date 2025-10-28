@@ -6,6 +6,8 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, ProtectedRoute } from "./contexts/AuthContext";
+import { ErrorTrackingProvider } from "./contexts/ErrorTrackingContext";
+import { ErrorFloatingButton } from "./components/ErrorFloatingButton";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Utentes from "./pages/Utentes";
@@ -58,17 +60,20 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <ErrorTrackingProvider>
+        <ThemeProvider
+          defaultTheme="light"
+          // switchable
+        >
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+              <ErrorFloatingButton />
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </ErrorTrackingProvider>
     </ErrorBoundary>
   );
 }
