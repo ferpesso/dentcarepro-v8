@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { nanoid } from 'nanoid';
+import bcrypt from 'bcrypt';
 import type { User } from '../../drizzle/schema';
 
 // ========================================
@@ -49,29 +50,28 @@ export interface AuthResponse {
 }
 
 // ========================================
-// FUNÇÕES DE HASH (Simulação - usar bcrypt em produção)
+// FUNÇÕES DE HASH (bcrypt)
 // ========================================
 
+const SALT_ROUNDS = 10;
+
 /**
- * Hash de senha (TEMPORÁRIO - usar bcrypt em produção)
+ * Hash de senha usando bcrypt
  */
 async function hashPassword(password: string): Promise<string> {
-  // IMPORTANTE: Esta é uma implementação temporária
-  // Em produção, usar bcrypt ou argon2
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + JWT_SECRET);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+  return await bcrypt.hash(password, SALT_ROUNDS);
 }
 
 /**
- * Verificar senha
+ * Verificar senha usando bcrypt
  */
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (error) {
+    console.error('Erro ao verificar senha:', error);
+    return false;
+  }
 }
 
 // ========================================
